@@ -5,8 +5,10 @@ export default defineConfig({
   plugins: [vue()],
   clearScreen: false,
   server: {
-    port: 5173,
+    // Keep in sync with tauri.conf.json devUrl (Tauri default 1420)
+    port: 1420,
     strictPort: true,
+    host: "127.0.0.1",
   },
   resolve: {
     alias: {

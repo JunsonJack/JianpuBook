@@ -8,6 +8,8 @@ dist/
 # Vite/tsc emit next to configs
 apps/desktop/vite.config.js
 apps/desktop/vite.config.d.ts
+apps/desktop/tsconfig.tsbuildinfo
+apps/desktop/tsconfig.node.tsbuildinfo
 
 # Rust
 target/

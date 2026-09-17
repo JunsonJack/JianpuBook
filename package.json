@@ -13,8 +13,9 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test:engine": "npm run test -w @jianpubook/jianpu-engine",
     "test:img": "cargo test --manifest-path crates/img-pipeline/Cargo.toml",
-    "dev:desktop": "npm run dev -w @jianpubook/desktop",
-    "tauri:dev": "npm run tauri:dev -w @jianpubook/desktop"
+    "dev:desktop": "npm run build -w @jianpubook/jianpu-engine && npm run dev -w @jianpubook/desktop",
+    "tauri:dev": "npm run build -w @jianpubook/jianpu-engine && npm run tauri:dev -w @jianpubook/desktop",
+    "tauri:build": "npm run build -w @jianpubook/jianpu-engine && npm run tauri:build -w @jianpubook/desktop"
   },
   "engines": {
     "node": ">=20"
