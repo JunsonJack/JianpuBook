@@ -23,6 +23,13 @@ const savedNote = ref("");
 const originalUrl = ref<string | null>(null);
 const enhancedUrl = ref<string | null>(null);
 const filePath = ref<string | null>(null);
+const meta = ref<{
+  elapsedMs: number;
+  inkRatio: number;
+  usedSauvola: boolean;
+  width: number;
+  height: number;
+} | null>(null);
 
 const presets: { id: EnhancePresetId; label: string; desc: string }[] = [
   { id: "light", label: "轻度", desc: "去偏 + median3 + Otsu" },
@@ -56,7 +63,14 @@ async function runEnhance() {
   busy.value = true;
   try {
     const out = await enhancePreview(filePath.value, preset.value);
-    enhancedUrl.value = convertFileSrc(out);
+    enhancedUrl.value = convertFileSrc(out.path);
+    meta.value = {
+      elapsedMs: out.elapsedMs,
+      inkRatio: out.inkRatio,
+      usedSauvola: out.usedSauvola,
+      width: out.width,
+      height: out.height,
+    };
     if (selectedId.value != null) {
       await saveEnhanceParams(selectedId.value, {
         preset: preset.value,
@@ -191,6 +205,12 @@ onMounted(async () => {
       <p class="hint">
         预设：<strong>{{ presets.find((p) => p.id === preset)?.label }}</strong>
         — {{ presets.find((p) => p.id === preset)?.desc }}
+      </p>
+      <p v-if="meta" class="hint">
+        {{ meta.width }}×{{ meta.height }} ·
+        墨量 {{ (meta.inkRatio * 100).toFixed(1) }}% ·
+        {{ meta.usedSauvola ? "Sauvola 回退" : "Otsu" }} ·
+        {{ meta.elapsedMs }}ms
       </p>
     </div>
     <div v-else class="panel empty">

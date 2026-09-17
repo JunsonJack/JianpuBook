@@ -200,20 +200,28 @@ pub fn import_images(
     Ok(out)
 }
 
-/// 增强预览：返回生成的 PNG 路径（convertFileSrc 后给 <img>）
+/// 增强预览：返回生成的 PNG 路径 + 元信息
 #[tauri::command]
 pub fn enhance_preview(
     path: String,
     preset: Option<String>,
-) -> Result<String, String> {
+) -> Result<EnhancePreviewDto, String> {
     let src = PathBuf::from(&path);
     let gray = load_gray(&src).map_err(map_err)?;
-    let params = match preset.as_deref() {
-        Some("light") => EnhancePreset::Light.params(),
-        Some("strong") => EnhancePreset::Strong.params(),
-        _ => EnhanceParams::default(),
+    let (params, preset_id) = match preset.as_deref() {
+        Some("light") => (EnhancePreset::Light.params(), "light"),
+        Some("strong") => (EnhancePreset::Strong.params(), "strong"),
+        _ => (EnhanceParams::default(), "standard"),
     };
+    let t0 = std::time::Instant::now();
     let out_img = enhance_gray(&gray, &params);
+    let elapsed_ms = t0.elapsed().as_millis() as u64;
+    // 墨量占比（二值后 <128）
+    let total = (out_img.width() as u64) * (out_img.height() as u64);
+    let ink = out_img.pixels().filter(|p| p.0[0] < 128).count() as u64;
+    let ink_ratio = if total == 0 { 0.0 } else { ink as f64 / total as f64 };
+    let used_sauvola = params.binarize && ink_ratio > params.ink_fallback;
+
     let dir = std::env::temp_dir().join("jianpubook-enhance");
     std::fs::create_dir_all(&dir).map_err(map_err)?;
     let stamp = std::time::SystemTime::now()
@@ -224,7 +232,27 @@ pub fn enhance_preview(
     DynamicImage::ImageLuma8(out_img)
         .save(&dest)
         .map_err(map_err)?;
-    Ok(dest.to_string_lossy().to_string())
+
+    Ok(EnhancePreviewDto {
+        path: dest.to_string_lossy().to_string(),
+        preset: preset_id.into(),
+        elapsed_ms,
+        ink_ratio,
+        used_sauvola,
+        width: gray.width(),
+        height: gray.height(),
+    })
+}
+
+#[derive(serde::Serialize)]
+pub struct EnhancePreviewDto {
+    pub path: String,
+    pub preset: String,
+    pub elapsed_ms: u64,
+    pub ink_ratio: f64,
+    pub used_sauvola: bool,
+    pub width: u32,
+    pub height: u32,
 }
 
 /// 保存非破坏性增强参数（JSON 字符串）

@@ -1,14 +1,18 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
 import type { Song } from "@/domain/library";
 import {
   convertFileSrc,
+  getSongText,
   hasTauri,
   importImages,
   importTextSong,
   listSongs,
   type ImportImageResult,
 } from "@/services/ipc";
+
+const router = useRouter();
 
 const songs = ref<Song[]>([]);
 const loading = ref(false);
@@ -92,6 +96,21 @@ function thumbSrc(s: Song): string | null {
 }
 
 onMounted(refresh);
+
+async function openInEditor(s: Song) {
+  if (s.type !== "text") return;
+  const body = await getSongText(s.id);
+  if (body) {
+    sessionStorage.setItem("jianpubook-edit-song", JSON.stringify({ id: s.id, title: s.title, text: body }));
+  } else {
+    sessionStorage.setItem(
+      "jianpubook-edit-song",
+      JSON.stringify({ id: s.id, title: s.title, text: `T: ${s.title}\nK: ${s.key ?? "1=C"}\nM: ${s.meter ?? "4/4"}\n\n` }),
+    );
+  }
+  void router.push("/editor");
+}
+
 </script>
 
 <template>
@@ -141,7 +160,13 @@ onMounted(refresh);
         <p v-if="loading">加载中…</p>
         <p v-else-if="error" class="error-list">{{ error }}</p>
         <div v-else class="song-wall">
-          <article v-for="s in songs" :key="s.id" class="song-card">
+          <article
+            v-for="s in songs"
+            :key="s.id"
+            class="song-card"
+            :class="{ clickable: s.type === 'text' }"
+            @click="openInEditor(s)"
+          >
             <div class="thumb">
               <img v-if="thumbSrc(s)" :src="thumbSrc(s)!" :alt="s.title" />
               <div v-else class="thumb-placeholder">
@@ -244,6 +269,12 @@ onMounted(refresh);
   border-radius: 10px;
   overflow: hidden;
   background: #faf9f6;
+}
+.song-card.clickable {
+  cursor: pointer;
+}
+.song-card.clickable:hover {
+  border-color: var(--accent);
 }
 .thumb {
   aspect-ratio: 3/4;

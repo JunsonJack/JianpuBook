@@ -159,13 +159,40 @@ export async function importImages(paths: string[]): Promise<ImportImageResult[]
 
 export type EnhancePresetId = "light" | "standard" | "strong";
 
+export interface EnhancePreviewResult {
+  path: string;
+  preset: string;
+  elapsedMs: number;
+  inkRatio: number;
+  usedSauvola: boolean;
+  width: number;
+  height: number;
+}
+
 export async function enhancePreview(
   path: string,
   preset: EnhancePresetId = "standard",
-): Promise<string> {
+): Promise<EnhancePreviewResult> {
   const invoke = getInvoke();
   if (!invoke) throw new Error("需要 Tauri 环境");
-  return invoke<string>("enhance_preview", { path, preset });
+  const r = await invoke<{
+    path: string;
+    preset: string;
+    elapsed_ms: number;
+    ink_ratio: number;
+    used_sauvola: boolean;
+    width: number;
+    height: number;
+  }>("enhance_preview", { path, preset });
+  return {
+    path: r.path,
+    preset: r.preset,
+    elapsedMs: r.elapsed_ms,
+    inkRatio: r.ink_ratio,
+    usedSauvola: r.used_sauvola,
+    width: r.width,
+    height: r.height,
+  };
 }
 
 export async function saveEnhanceParams(
@@ -192,4 +219,19 @@ export async function loadEnhanceParams(
   } catch {
     return null;
   }
+}
+
+export async function getSongText(songId: number): Promise<string | null> {
+  const invoke = getInvoke();
+  if (!invoke) return null;
+  return invoke<string | null>("get_song_text", { songId });
+}
+
+export async function updateSongText(
+  songId: number,
+  jianpuText: string,
+): Promise<void> {
+  const invoke = getInvoke();
+  if (!invoke) return;
+  await invoke("update_song_text", { songId, jianpuText });
 }

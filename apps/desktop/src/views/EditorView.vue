@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { analyze, transposeJianpuText } from "@jianpubook/jianpu-engine";
-import { hasTauri, listSongs, importTextSong } from "@/services/ipc";
+import {
+  hasTauri,
+  listSongs,
+  importTextSong,
+  updateSongText,
+} from "@/services/ipc";
 
 const KEYS = [
   "1=C",
@@ -35,6 +40,7 @@ const status = ref("");
 const error = ref("");
 const tauri = hasTauri();
 const libraryTextSongs = ref<{ id: number; title: string }[]>([]);
+const editSongId = ref<number | null>(null);
 
 const result = computed(() => {
   try {
@@ -75,12 +81,18 @@ async function saveToLibrary() {
   status.value = "";
   error.value = "";
   try {
+    if (editSongId.value != null && tauri) {
+      await updateSongText(editSongId.value, text.value);
+      status.value = `已更新曲库 #${editSongId.value}`;
+      return;
+    }
     const id = await importTextSong({
       title: title.value || result.value?.song.headers.T || "未命名",
       key: result.value?.song.headers.K,
       meter: result.value?.song.headers.M,
       jianpuText: text.value,
     });
+    editSongId.value = id;
     status.value = tauri
       ? `已写入曲库 #${id}`
       : `mock 写入 #${id}（启动 Tauri 后落库）`;
@@ -100,7 +112,24 @@ function applyTranspose(toKey: string) {
   status.value = `已移调到 ${toKey}（数字不变）`;
 }
 
-onMounted(refreshTextSongs);
+onMounted(async () => {
+  const raw = sessionStorage.getItem("jianpubook-edit-song");
+  if (raw) {
+    try {
+      const o = JSON.parse(raw) as { id?: number; title?: string; text?: string };
+      if (o.text) {
+        text.value = o.text;
+        if (o.title) title.value = o.title;
+        if (o.id != null) editSongId.value = o.id;
+        status.value = o.id != null ? `正在编辑曲库 #${o.id}` : "已载入草稿";
+      }
+    } catch {
+      /* ignore */
+    }
+    sessionStorage.removeItem("jianpubook-edit-song");
+  }
+  await refreshTextSongs();
+});
 </script>
 
 <template>
