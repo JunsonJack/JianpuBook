@@ -1,0 +1,9 @@
+# JianpuBook 桌面端 Cargo 配置
+# Windows 上 incremental 目录偶发「拒绝访问 / os error 5」（杀软/并发锁）。
+# 关掉增量：编译稍慢，但 dev 热重载更稳。
+[profile.dev]
+incremental = false
+
+[profile.dev.package."*"]
+# 依赖仍可增量，减少全量重编
+incremental = true

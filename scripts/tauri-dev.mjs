@@ -51,6 +51,21 @@ function freePort(port) {
   }
 }
 
+/** 清理被占用的 incremental 目录（Windows os error 5） */
+function cleanStuckIncremental() {
+  const inc = join(desktop, "src-tauri", "target", "debug", "incremental");
+  if (!existsSync(inc)) return;
+  try {
+    execSync(
+      `powershell -NoProfile -Command "Remove-Item -Recurse -Force '${inc.replace(/'/g, "''")}' -ErrorAction SilentlyContinue"`,
+      { stdio: "ignore" },
+    );
+    log("已清理 target/debug/incremental");
+  } catch {
+    /* ignore */
+  }
+}
+
 log("构建 jianpu-engine…");
 execSync("npm run build -w @jianpubook/jianpu-engine", {
   cwd: root,
@@ -58,6 +73,7 @@ execSync("npm run build -w @jianpubook/jianpu-engine", {
 });
 
 freePort(1420);
+cleanStuckIncremental();
 
 log("启动 tauri dev（Vite http://127.0.0.1:1420）…");
 
