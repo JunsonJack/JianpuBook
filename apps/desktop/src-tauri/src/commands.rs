@@ -109,6 +109,21 @@ fn import_one(state: &State<'_, LibraryState>, path: &Path) -> Result<ImportResu
     };
 
     let lib = state.library.lock().map_err(map_err)?;
+
+    // 精确 pHash 命中：跳过全量扫描
+    if let Some(id) = lib.find_by_phash_exact(&hash).map_err(map_err)? {
+        return Ok(ImportResult {
+            song_id: id,
+            title,
+            path: path_str,
+            phash: Some(hash),
+            duplicate_of: Some(id),
+            status: "duplicate".into(),
+            message: Some(format!("与曲目 #{id} 重复（pHash 完全一致）")),
+            thumb_path: None,
+        });
+    }
+
     let hashes = lib.all_hashes().map_err(map_err)?;
     let candidate = parse_hash_hex(&hash).unwrap_or(0);
     let (dup, near, min_d) = find_near(&hashes, candidate);
