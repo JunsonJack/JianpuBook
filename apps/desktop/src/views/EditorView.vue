@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { analyze } from "@jianpubook/jianpu-engine";
+import { hasTauri, listSongs, importTextSong } from "@/services/ipc";
 
 const sample = `T: 小星星
 K: 1=C
@@ -16,6 +17,11 @@ S: 儿歌
 `;
 
 const text = ref(sample);
+const title = ref("小星星");
+const status = ref("");
+const error = ref("");
+const tauri = hasTauri();
+const libraryTextSongs = ref<{ id: number; title: string }[]>([]);
 
 const result = computed(() => {
   try {
@@ -39,17 +45,61 @@ const beamSummary = computed(() => {
     .map((b) => `m${b.measure}[${b.indices.join(",")}]`)
     .join("  ");
 });
+
+async function refreshTextSongs() {
+  if (!tauri) return;
+  try {
+    const all = await listSongs();
+    libraryTextSongs.value = all
+      .filter((s) => s.type === "text")
+      .map((s) => ({ id: s.id, title: s.title }));
+  } catch {
+    /* ignore */
+  }
+}
+
+async function saveToLibrary() {
+  status.value = "";
+  error.value = "";
+  try {
+    const id = await importTextSong({
+      title: title.value || result.value?.song.headers.T || "未命名",
+      key: result.value?.song.headers.K,
+      meter: result.value?.song.headers.M,
+      jianpuText: text.value,
+    });
+    status.value = tauri
+      ? `已写入曲库 #${id}`
+      : `mock 写入 #${id}（启动 Tauri 后落库）`;
+    await refreshTextSongs();
+  } catch (e) {
+    error.value = String(e);
+  }
+}
+
+function copyText() {
+  void navigator.clipboard.writeText(text.value);
+  status.value = "源码已复制";
+}
+
+onMounted(refreshTextSongs);
 </script>
 
 <template>
   <div>
     <h1>文本谱编辑</h1>
     <p class="hint">
-      JianpuText 即时解析 → 校验 → SVG 谱面预览。数字 / 八度点 / 减时线 / 连音 / 歌词均已绘制。
+      JianpuText 即时解析 → 校验 → SVG 谱面。可保存进曲库后加入册子。
     </p>
     <div class="editor-layout">
       <div class="panel">
+        <div class="row">
+          <input v-model="title" class="title-input" placeholder="曲名" />
+          <button class="btn" @click="saveToLibrary">存入曲库</button>
+          <button class="btn ghost" @click="copyText">复制源码</button>
+        </div>
         <textarea v-model="text" class="jianpu" spellcheck="false" />
+        <p v-if="status" class="ok">{{ status }}</p>
         <div v-if="result?.parseErrors.length" class="error-list">
           无法解析：{{ result.parseErrors.join(", ") }}
         </div>
@@ -70,12 +120,47 @@ const beamSummary = computed(() => {
         <div class="score-preview" v-html="result?.svg ?? ''" />
         <p class="hint">时值：{{ measureSummary || "—" }}</p>
         <p class="hint">连音组：{{ beamSummary || "无" }}</p>
+        <p v-if="libraryTextSongs.length" class="hint">
+          曲库文本谱：{{ libraryTextSongs.map((s) => s.title).join("、") }}
+        </p>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
+.row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+  align-items: center;
+}
+.title-input {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 14px;
+}
+.btn {
+  background: var(--accent);
+  color: #fff;
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.btn.ghost {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+}
+.ok {
+  color: var(--accent);
+  font-size: 13px;
+  margin: 6px 0;
+}
 .score-preview {
   overflow: auto;
   border: 1px solid var(--line);
