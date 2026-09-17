@@ -11,10 +11,15 @@
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
+    "test:engine": "npm run test -w @jianpubook/jianpu-engine",
+    "test:img": "cargo test --manifest-path crates/img-pipeline/Cargo.toml",
     "dev:desktop": "npm run dev -w @jianpubook/desktop",
     "tauri:dev": "npm run tauri:dev -w @jianpubook/desktop"
   },
   "engines": {
     "node": ">=20"
+  },
+  "allowScripts": {
+    "esbuild@0.25.12": true
   }
 }
