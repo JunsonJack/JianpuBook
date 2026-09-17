@@ -8,6 +8,7 @@ use tauri::Manager;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let data_dir = app
                 .path()
@@ -26,6 +27,7 @@ pub fn run() {
             commands::list_songs,
             commands::import_text_song,
             commands::import_images,
+            commands::import_images_from_bytes,
             commands::enhance_preview,
             commands::save_enhance_params,
             commands::load_enhance_params,

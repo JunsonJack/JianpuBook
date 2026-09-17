@@ -82,6 +82,19 @@ fn import_one_with_hash(
 ) -> Result<ImportResult, String> {
     let path_str = path.to_string_lossy().to_string();
     let title = title_from_path(path);
+    if !path.is_file() {
+        let msg = format!("系统找不到指定文件: {path_str}");
+        return Ok(ImportResult {
+            song_id: 0,
+            title,
+            path: path_str,
+            phash: None,
+            duplicate_of: None,
+            status: "error".into(),
+            message: Some(msg),
+            thumb_path: None,
+        });
+    }
 
     let lib = state.library.lock().map_err(map_err)?;
     if let Some(id) = lib.find_by_phash_exact(&hash).map_err(map_err)? {
@@ -196,6 +209,67 @@ pub fn import_images(
         }
     }
     Ok(out)
+}
+
+/// 从内存字节导入（HTML file input / 拖拽在 Tauri 2 无真实路径时使用）
+#[tauri::command]
+pub fn import_images_from_bytes(
+    state: State<'_, LibraryState>,
+    files: Vec<ByteFile>,
+) -> Result<Vec<ImportResult>, String> {
+    use rayon::prelude::*;
+
+    let staging = state.paths.data_dir.join("staging");
+    std::fs::create_dir_all(&staging).map_err(map_err)?;
+
+    let mut saved: Vec<PathBuf> = Vec::new();
+    for (i, f) in files.iter().enumerate() {
+        let safe = f
+            .name
+            .chars()
+            .map(|c| if c.is_alphanumeric() || c == '.' || c == '-' || c == '_' { c } else { '_' })
+            .collect::<String>();
+        let name = if safe.is_empty() {
+            format!("upload_{i}.png")
+        } else {
+            format!("{i}_{safe}")
+        };
+        let dest = staging.join(name);
+        std::fs::write(&dest, &f.bytes).map_err(map_err)?;
+        saved.push(dest);
+    }
+
+    let hashed: Vec<(PathBuf, Result<String, String>)> = saved
+        .par_iter()
+        .map(|p| {
+            let h = hash_file(p).map_err(|e| e.to_string());
+            (p.clone(), h)
+        })
+        .collect();
+
+    let mut out = Vec::new();
+    for (path, hash) in hashed {
+        match hash {
+            Ok(h) => out.push(import_one_with_hash(&state, &path, h)?),
+            Err(e) => out.push(ImportResult {
+                song_id: 0,
+                title: title_from_path(&path),
+                path: path.to_string_lossy().to_string(),
+                phash: None,
+                duplicate_of: None,
+                status: "error".into(),
+                message: Some(e),
+                thumb_path: None,
+            }),
+        }
+    }
+    Ok(out)
+}
+
+#[derive(serde::Deserialize)]
+pub struct ByteFile {
+    pub name: String,
+    pub bytes: Vec<u8>,
 }
 
 /// 增强预览：返回生成的 PNG 路径 + 元信息

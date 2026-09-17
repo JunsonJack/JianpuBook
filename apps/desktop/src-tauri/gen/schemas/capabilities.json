@@ -1,1 +1,1 @@
-{"default":{"identifier":"default","description":"默认能力：允许主窗口核心功能","local":true,"windows":["main"],"permissions":["core:default"]}}
+{"default":{"identifier":"default","description":"默认能力：核心 + 文件对话框","local":true,"windows":["main"],"permissions":["core:default","dialog:default"]}}

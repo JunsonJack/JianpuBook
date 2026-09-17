@@ -11,6 +11,7 @@ import {
   saveEnhanceParams,
   type EnhancePresetId,
 } from "@/services/ipc";
+import { pickImageFiles } from "@/services/filePick";
 
 const tauri = hasTauri();
 const imageSongs = ref<Song[]>([]);
@@ -111,15 +112,34 @@ function loadSelected() {
 }
 
 async function onPickFile(e: Event) {
+  // 兼容：若走系统对话框则不用这个 handler
   const input = e.target as HTMLInputElement;
   const f = input.files?.[0];
   if (!f) return;
   const anyF = f as File & { path?: string };
-  filePath.value = anyF.path || f.name;
+  const p = anyF.path;
+  if (!p || p.length <= 3) {
+    error.value =
+      "Tauri 2 下 HTML 选文件无真实路径。请点「系统选择…」用对话框选图。";
+    input.value = "";
+    return;
+  }
+  filePath.value = p;
   originalUrl.value = URL.createObjectURL(f);
   enhancedUrl.value = null;
   selectedId.value = null;
   if (tauri) await runEnhance();
+}
+
+async function pickViaDialog() {
+  const picked = await pickImageFiles();
+  const first = picked[0];
+  if (!first?.path) return;
+  filePath.value = first.path;
+  originalUrl.value = convertFileSrc(first.path);
+  enhancedUrl.value = null;
+  selectedId.value = null;
+  await runEnhance();
 }
 
 watch(selectedId, () => {
@@ -191,6 +211,9 @@ onMounted(async () => {
       </label>
       <label>
         或选择文件
+        <button type="button" class="btn ghost" @click="pickViaDialog">
+          系统选择…
+        </button>
         <input type="file" accept="image/*" @change="onPickFile" />
       </label>
       <div class="presets">

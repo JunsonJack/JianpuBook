@@ -7,6 +7,7 @@ import {
   getSongText,
   hasTauri,
   importImages,
+  importImagesFromBytes,
   importTextSong,
   listSongs,
   seedDemo,
@@ -14,6 +15,11 @@ import {
   setSongTags,
   type ImportImageResult,
 } from "@/services/ipc";
+import {
+  filesToBytePayload,
+  pickImageFiles,
+  pickImageFolder,
+} from "@/services/filePick";
 import { addBookItem, listBooks, type BookSummary } from "@/services/bookIpc";
 
 const router = useRouter();
@@ -82,16 +88,12 @@ async function importDraft() {
   }
 }
 
-/** HTML File 在 Tauri 下 path 可能是 web fake path；优先 webkitRelativePath / path */
-function filePathOf(f: File): string {
-  const anyF = f as File & { path?: string };
-  return anyF.path || (f as unknown as { webkitRelativePath?: string }).webkitRelativePath || f.name;
+/** HTML File：Tauri 2 常无真实 path，只取 name 做展示 */
+function fileDisplayName(f: File): string {
+  return f.name;
 }
 
-async function handleFiles(list: FileList | File[] | null) {
-  if (!list || list.length === 0) return;
-  const files = Array.from(list);
-  const paths = files.map(filePathOf).filter(Boolean);
+async function importByPaths(paths: string[]) {
   if (paths.length === 0) return;
   importing.value = true;
   error.value = "";
@@ -106,13 +108,59 @@ async function handleFiles(list: FileList | File[] | null) {
   }
 }
 
+async function handleFiles(list: FileList | File[] | null) {
+  if (!list || list.length === 0) return;
+  const files = Array.from(list);
+  if (!tauri) {
+    error.value = "浏览器 mock 模式无法读取本地文件，请启动 Tauri";
+    return;
+  }
+  // 优先：若 File 上有真实 path（少数环境），直接按路径导入
+  const withPath = files
+    .map((f) => {
+      const p = (f as File & { path?: string }).path;
+      return p && p.length > 3 ? p : null;
+    })
+    .filter((p): p is string => Boolean(p));
+  if (withPath.length === files.length) {
+    await importByPaths(withPath);
+    return;
+  }
+  // 回退：读字节导入（修复「系统找不到指定文件」）
+  importing.value = true;
+  error.value = "";
+  try {
+    const payload = await filesToBytePayload(files.map((f) => f));
+    const results = await importImagesFromBytes(payload);
+    importLog.value = results;
+    await refresh();
+  } catch (e) {
+    error.value = String(e);
+  } finally {
+    importing.value = false;
+  }
+}
+
 function onDrop(e: DragEvent) {
   dragOver.value = false;
   void handleFiles(e.dataTransfer?.files ?? null);
 }
 
-function pickFiles() {
+async function pickFiles() {
+  if (tauri) {
+    const picked = await pickImageFiles();
+    const paths = picked.map((p) => p.path).filter((p): p is string => Boolean(p));
+    if (paths.length) {
+      await importByPaths(paths);
+      return;
+    }
+  }
   fileInput.value?.click();
+}
+
+async function pickFolder() {
+  const dirs = await pickImageFolder();
+  if (dirs.length) await importByPaths(dirs);
 }
 
 function thumbSrc(s: Song): string | null {
@@ -246,6 +294,9 @@ async function editTags(s: Song) {
       <p>拖入简谱图片（jpg/png/webp…）或文件夹内文件</p>
       <button class="btn" :disabled="importing" @click="pickFiles">
         {{ importing ? "导入中…" : "选择图片" }}
+      </button>
+      <button v-if="tauri" class="btn ghost" :disabled="importing" @click="pickFolder">
+        选择文件夹
       </button>
       <input
         ref="fileInput"

@@ -146,7 +146,20 @@ export async function importImages(paths: string[]): Promise<ImportImageResult[]
       thumbPath: string | null;
     }[]
   >("import_images", { paths });
-  return rows.map((r) => ({
+  return rows.map(normalizeImportRow);
+}
+
+function normalizeImportRow(r: {
+  song_id: number;
+  title: string;
+  path: string;
+  phash: string | null;
+  duplicate_of: number | null;
+  status: string;
+  message: string | null;
+  thumbPath: string | null;
+}): ImportImageResult {
+  return {
     songId: r.song_id,
     title: r.title,
     path: r.path,
@@ -155,7 +168,28 @@ export async function importImages(paths: string[]): Promise<ImportImageResult[]
     status: r.status as ImportImageResult["status"],
     message: r.message,
     thumbPath: r.thumbPath,
-  }));
+  };
+}
+
+/** HTML File 无真实路径时，按字节导入 */
+export async function importImagesFromBytes(
+  files: { name: string; bytes: number[] }[],
+): Promise<ImportImageResult[]> {
+  const invoke = getInvoke();
+  if (!invoke) throw new Error("需要 Tauri");
+  const rows = await invoke<
+    {
+      song_id: number;
+      title: string;
+      path: string;
+      phash: string | null;
+      duplicate_of: number | null;
+      status: string;
+      message: string | null;
+      thumbPath: string | null;
+    }[]
+  >("import_images_from_bytes", { files });
+  return rows.map(normalizeImportRow);
 }
 
 export type EnhancePresetId = "light" | "standard" | "strong";
