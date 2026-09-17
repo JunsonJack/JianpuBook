@@ -38,6 +38,15 @@ const presets: { id: EnhancePresetId; label: string; desc: string }[] = [
   { id: "strong", label: "强力", desc: "median5 + 更严墨量阈 + 裁白边" },
 ];
 
+const showAdvanced = ref(false);
+const adv = ref({
+  deskew: true,
+  median: 3,
+  sharpen: 0.8,
+  binarize: true,
+  cropBorder: false,
+});
+
 const selected = computed(
   () => imageSongs.value.find((s) => s.id === selectedId.value) ?? null,
 );
@@ -63,7 +72,7 @@ async function runEnhance() {
   if (!filePath.value || !tauri) return;
   busy.value = true;
   try {
-    const out = await enhancePreview(filePath.value, preset.value);
+    const out = await enhancePreview(filePath.value, preset.value, showAdvanced.value ? { ...adv.value } : undefined);
     enhancedUrl.value = convertFileSrc(out.path);
     meta.value = {
       elapsedMs: out.elapsedMs,
@@ -203,6 +212,40 @@ onMounted(async () => {
       <button class="btn ghost" :disabled="busy || !tauri" @click="runBatch">
         批量增强曲库图片
       </button>
+      <label class="check">
+        <input v-model="showAdvanced" type="checkbox" @change="runEnhance" />
+        高级参数
+      </label>
+    </div>
+
+    <div v-if="showAdvanced" class="adv panel">
+      <label><input v-model="adv.deskew" type="checkbox" @change="runEnhance" /> 去偏</label>
+      <label>
+        median
+        <input
+          v-model.number="adv.median"
+          type="number"
+          min="0"
+          max="9"
+          step="2"
+          @change="runEnhance"
+        />
+      </label>
+      <label>
+        锐化
+        <input
+          v-model.number="adv.sharpen"
+          type="range"
+          min="0"
+          max="2"
+          step="0.1"
+          @change="runEnhance"
+        />
+        {{ adv.sharpen.toFixed(1) }}
+      </label>
+      <label><input v-model="adv.binarize" type="checkbox" @change="runEnhance" /> 二值化</label>
+      <label><input v-model="adv.cropBorder" type="checkbox" @change="runEnhance" /> 裁白边</label>
+      <p class="hint">极性约定：墨=0 / 背景=255。开运算/连通域默认关闭（W0）。</p>
     </div>
 
     <p v-if="statusMsg" class="ok-note">{{ statusMsg }}</p>
@@ -302,6 +345,32 @@ onMounted(async () => {
 .btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+}
+.check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.adv {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 14px;
+  font-size: 13px;
+}
+.adv label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.adv input[type="number"] {
+  width: 64px;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
 }
 .ok-note {
   color: var(--accent);
