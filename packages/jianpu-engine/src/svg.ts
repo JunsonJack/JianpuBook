@@ -184,6 +184,17 @@ export function renderSvg(layout: ScoreLayout): string {
         `<line x1="${b.startX}" y1="${oy + b.y}" x2="${b.endX}" y2="${oy + b.y}" stroke="#1c1b19" stroke-width="${w}"/>`,
       );
     }
+
+    // 三连音括号
+    for (const t of line.triplets ?? []) {
+      const y = oy + t.y;
+      body.push(
+        `<path d="M ${t.startX} ${y + 4} L ${t.startX} ${y} L ${t.endX} ${y} L ${t.endX} ${y + 4}" fill="none" stroke="#1c1b19" stroke-width="1"/>`,
+      );
+      body.push(
+        `<text x="${(t.startX + t.endX) / 2}" y="${y - 3}" text-anchor="middle" font-size="10" font-family="sans-serif" fill="#1c1b19">3</text>`,
+      );
+    }
   }
 
   return [

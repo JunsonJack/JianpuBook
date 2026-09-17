@@ -122,6 +122,16 @@ watch(preset, () => {
 
 onMounted(async () => {
   await refreshLibrary();
+  const pick = sessionStorage.getItem("jianpubook-enhance-pick");
+  if (pick) {
+    try {
+      const o = JSON.parse(pick) as { id?: number };
+      if (o.id != null) selectedId.value = o.id;
+    } catch {
+      /* ignore */
+    }
+    sessionStorage.removeItem("jianpubook-enhance-pick");
+  }
   loadSelected();
   if (selectedId.value != null) {
     const p = await loadEnhanceParams(selectedId.value);

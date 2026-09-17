@@ -99,4 +99,10 @@ describe('renderSvg', () => {
     expect(r.svg).toContain('♯');
     expect(r.svg).toContain('♭');
   });
+
+  it('三连音画括号与 3', () => {
+    const r = analyze(`M: 4/4\n\n(1_ 2_ 3_) 4 5 6 | 1 2 3 4 |`);
+    expect(r.svg).toContain('>3<');
+    expect(r.layout.lines[0]!.triplets.length).toBeGreaterThanOrEqual(1);
+  });
 });

@@ -57,6 +57,8 @@ export interface LayoutCell {
   lyrics: LyricSlot[];
   beamId: number | null;
   beamEnd: boolean;
+  /** 三连音组 id；null 非三连音 */
+  tripletId: number | null;
   /** 该 cell 对应的全局音符序号（用于歌词配对） */
   noteIndex: number;
 }
@@ -69,10 +71,19 @@ export interface BeamSpan {
   level: number;
 }
 
+export interface TripletSpan {
+  id: number;
+  startX: number;
+  endX: number;
+  /** 括号 y（谱行内相对坐标） */
+  y: number;
+}
+
 export interface LayoutLine {
   y: number;
   cells: LayoutCell[];
   beams: BeamSpan[];
+  triplets: TripletSpan[];
   measureNumber: number | null;
   height: number;
 }
@@ -112,6 +123,7 @@ function cellWidthFor(
 interface EmitCtx {
   theme: RenderTheme;
   noteIndex: number;
+  tripletSeq: number;
 }
 
 function pushNoteCell(
@@ -131,6 +143,7 @@ function pushNoteCell(
     takesLyric: boolean;
     beamId: number | null;
     beamEnd?: boolean;
+    tripletId?: number | null;
   },
 ): void {
   out.push({
@@ -147,6 +160,7 @@ function pushNoteCell(
     lyrics: [],
     beamId: fields.beamId,
     beamEnd: fields.beamEnd ?? false,
+    tripletId: fields.tripletId ?? null,
     noteIndex: fields.takesLyric ? ctx.noteIndex : -1,
   });
   if (fields.takesLyric) ctx.noteIndex += 1;
@@ -210,6 +224,7 @@ function emitToken(
         lyrics: [],
         beamId: null,
         beamEnd: false,
+        tripletId: null,
         noteIndex: -1,
       });
       return;
@@ -233,6 +248,7 @@ function emitToken(
         lyrics: [],
         beamId: null,
         beamEnd: false,
+        tripletId: null,
         noteIndex: -1,
       });
       return;
@@ -265,6 +281,8 @@ function emitToken(
         (x): x is Extract<Token, { kind: 'note' | 'rest' }> =>
           x.kind === 'note' || x.kind === 'rest',
       );
+      ctx.tripletSeq += 1;
+      const tid = ctx.tripletSeq;
       notes.forEach((n, i) => {
         const p = n.payload;
         pushNoteCell(out, ctx, {
@@ -280,6 +298,7 @@ function emitToken(
           takesLyric: n.kind === 'note',
           beamId,
           beamEnd: i === notes.length - 1,
+          tripletId: tid,
         });
       });
       return;
@@ -434,7 +453,7 @@ export function layoutScoreFromOrdered(
     b.indices.forEach((idx) => beamMap.set(`${b.measure}:${idx}`, i));
   });
 
-  const ctx: EmitCtx = { theme, noteIndex: 0 };
+  const ctx: EmitCtx = { theme, noteIndex: 0, tripletSeq: 0 };
   const measureCellLists: LayoutCell[][] = [];
 
   measures.forEach((m) => {
@@ -501,10 +520,27 @@ export function layoutScoreFromOrdered(
       }
     }
     const height = theme.lineHeight + verseCount * theme.lyricLineHeight;
+    // 三连音括号
+    const tripById = new Map<number, LayoutCell[]>();
+    for (const c of current) {
+      if (c.tripletId === null) continue;
+      const arr = tripById.get(c.tripletId) ?? [];
+      arr.push(c);
+      tripById.set(c.tripletId, arr);
+    }
+    const triplets: TripletSpan[] = [];
+    for (const [id, group] of tripById) {
+      if (group.length < 2) continue;
+      const startX = group[0]!.x;
+      const endX =
+        group[group.length - 1]!.x + group[group.length - 1]!.width;
+      triplets.push({ id, startX, endX, y: 6 });
+    }
     layoutLines.push({
       y: 0,
       cells: current,
       beams: beamSpans,
+      triplets,
       measureNumber: lineMeasureNumber,
       height,
     });

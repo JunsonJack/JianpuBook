@@ -116,17 +116,34 @@ function thumbSrc(s: Song): string | null {
 onMounted(refresh);
 
 async function openInEditor(s: Song) {
-  if (s.type !== "text") return;
-  const body = await getSongText(s.id);
-  if (body) {
-    sessionStorage.setItem("jianpubook-edit-song", JSON.stringify({ id: s.id, title: s.title, text: body }));
-  } else {
+  if (s.type === "text") {
+    const body = await getSongText(s.id);
+    if (body) {
+      sessionStorage.setItem(
+        "jianpubook-edit-song",
+        JSON.stringify({ id: s.id, title: s.title, text: body }),
+      );
+    } else {
+      sessionStorage.setItem(
+        "jianpubook-edit-song",
+        JSON.stringify({
+          id: s.id,
+          title: s.title,
+          text: `T: ${s.title}\nK: ${s.key ?? "1=C"}\nM: ${s.meter ?? "4/4"}\n\n`,
+        }),
+      );
+    }
+    void router.push("/editor");
+    return;
+  }
+  // 图片谱 → 增强页
+  if (s.originalPath) {
     sessionStorage.setItem(
-      "jianpubook-edit-song",
-      JSON.stringify({ id: s.id, title: s.title, text: `T: ${s.title}\nK: ${s.key ?? "1=C"}\nM: ${s.meter ?? "4/4"}\n\n` }),
+      "jianpubook-enhance-pick",
+      JSON.stringify({ id: s.id, path: s.originalPath }),
     );
   }
-  void router.push("/editor");
+  void router.push("/enhance");
 }
 
 async function bumpStars(s: Song) {
@@ -208,7 +225,8 @@ async function bumpStars(s: Song) {
             v-for="s in filteredSongs"
             :key="s.id"
             class="song-card"
-            :class="{ clickable: s.type === 'text' }"
+            :class="{ clickable: true }"
+            :title="s.type === 'text' ? '打开编辑' : '打开增强'"
             @click="openInEditor(s)"
           >
             <div class="thumb">
