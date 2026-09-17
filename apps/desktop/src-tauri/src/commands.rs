@@ -96,71 +96,79 @@ fn import_one_with_hash(
         });
     }
 
-    let lib = state.library.lock().map_err(map_err)?;
-    if let Some(id) = lib.find_by_phash_exact(&hash).map_err(map_err)? {
-        return Ok(ImportResult {
-            song_id: id,
-            title,
-            path: path_str,
-            phash: Some(hash),
-            duplicate_of: Some(id),
-            status: "duplicate".into(),
-            message: Some(format!("与曲目 #{id} 重复（pHash 完全一致）")),
-            thumb_path: None,
-        });
-    }
-
-    let hashes = lib.all_hashes().map_err(map_err)?;
-    let candidate = parse_hash_hex(&hash).unwrap_or(0);
-    let (dup, near, min_d) = find_near(&hashes, candidate);
-
-    if let Some(id) = dup {
-        return Ok(ImportResult {
-            song_id: id,
-            title,
-            path: path_str,
-            phash: Some(hash),
-            duplicate_of: Some(id),
-            status: "duplicate".into(),
-            message: Some(format!("与曲目 #{id} 重复（距离 {min_d} ≤10）")),
-            thumb_path: None,
-        });
-    }
-
+    // 先写缩略图（IO 重，不持 DB 锁）
     let thumb_name = format!("{hash}.png");
     let thumb_path = state.paths.thumbs_dir().join(&thumb_name);
     let thumb_str = thumb_path.to_string_lossy().to_string();
     let thumb_written = write_thumbnail(path, &thumb_path, 240, 320).is_ok();
-    let thumb_opt = if thumb_written {
-        Some(thumb_str.as_str())
-    } else {
-        None
-    };
 
-    let song_id = lib
-        .insert_image_song(&title, &path_str, Some(&hash), thumb_opt)
-        .map_err(map_err)?;
+    // 短暂持锁：查重 + 入库
+    let song_id;
+    let duplicate_of: Option<i64>;
+    let status: String;
+    let message: Option<String>;
+    {
+        let lib = state.library.lock().map_err(map_err)?;
+        if let Some(id) = lib.find_by_phash_exact(&hash).map_err(map_err)? {
+            return Ok(ImportResult {
+                song_id: id,
+                title,
+                path: path_str,
+                phash: Some(hash),
+                duplicate_of: Some(id),
+                status: "duplicate".into(),
+                message: Some(format!("与曲目 #{id} 重复（pHash 完全一致）")),
+                thumb_path: None,
+            });
+        }
 
-    let status = if near.is_some() { "near" } else { "new" };
-    let message = near.map(|nid| {
-        format!("与曲目 #{nid} 近重复（距离 {min_d}，11–14），请人工确认")
-    });
+        let hashes = lib.all_hashes().map_err(map_err)?;
+        let candidate = parse_hash_hex(&hash).unwrap_or(0);
+        let (dup, near, min_d) = find_near(&hashes, candidate);
+
+        if let Some(id) = dup {
+            return Ok(ImportResult {
+                song_id: id,
+                title,
+                path: path_str,
+                phash: Some(hash),
+                duplicate_of: Some(id),
+                status: "duplicate".into(),
+                message: Some(format!("与曲目 #{id} 重复（距离 {min_d} ≤10）")),
+                thumb_path: None,
+            });
+        }
+
+        let thumb_opt = if thumb_written {
+            Some(thumb_str.as_str())
+        } else {
+            None
+        };
+        song_id = lib
+            .insert_image_song(&title, &path_str, Some(&hash), thumb_opt)
+            .map_err(map_err)?;
+        duplicate_of = near;
+        status = if near.is_some() { "near" } else { "new" }.into();
+        message = near.map(|nid| {
+            format!("与曲目 #{nid} 近重复（距离 {min_d}，11–14），请人工确认")
+        });
+    }
 
     Ok(ImportResult {
         song_id,
         title,
         path: path_str,
         phash: Some(hash),
-        duplicate_of: near,
-        status: status.into(),
+        duplicate_of,
+        status,
         message,
         thumb_path: if thumb_written { Some(thumb_str) } else { None },
     })
 }
 
-/// 批量导入图片（绝对路径或目录）。哈希并行，入库串行。
+/// 批量导入图片（绝对路径或目录）。async：哈希在后台线程，避免卡 UI。
 #[tauri::command]
-pub fn import_images(
+pub async fn import_images(
     state: State<'_, LibraryState>,
     paths: Vec<String>,
 ) -> Result<Vec<ImportResult>, String> {
@@ -183,7 +191,7 @@ pub fn import_images(
         }
     }
 
-    // 并行算哈希（CPU 重），DB 写入仍串行避免锁竞争
+    // CPU 重：并行 pHash
     let hashed: Vec<(PathBuf, Result<String, String>)> = files
         .par_iter()
         .map(|p| {
@@ -211,9 +219,9 @@ pub fn import_images(
     Ok(out)
 }
 
-/// 从内存字节导入（HTML file input / 拖拽在 Tauri 2 无真实路径时使用）
+/// 从内存字节导入（HTML file input / 拖拽无真实路径时）
 #[tauri::command]
-pub fn import_images_from_bytes(
+pub async fn import_images_from_bytes(
     state: State<'_, LibraryState>,
     files: Vec<ByteFile>,
 ) -> Result<Vec<ImportResult>, String> {
@@ -227,7 +235,13 @@ pub fn import_images_from_bytes(
         let safe = f
             .name
             .chars()
-            .map(|c| if c.is_alphanumeric() || c == '.' || c == '-' || c == '_' { c } else { '_' })
+            .map(|c| {
+                if c.is_alphanumeric() || c == '.' || c == '-' || c == '_' {
+                    c
+                } else {
+                    '_'
+                }
+            })
             .collect::<String>();
         let name = if safe.is_empty() {
             format!("upload_{i}.png")
@@ -272,10 +286,9 @@ pub struct ByteFile {
     pub bytes: Vec<u8>,
 }
 
-/// 增强预览：返回生成的 PNG 路径 + 元信息
-/// preset: light|standard|strong；overrides 可覆盖 deskew/median/sharpen/binarize 等
+/// 增强预览：async，避免大图时卡 UI
 #[tauri::command]
-pub fn enhance_preview(
+pub async fn enhance_preview(
     path: String,
     preset: Option<String>,
     overrides: Option<serde_json::Value>,
@@ -517,9 +530,9 @@ pub fn set_song_tags(
     lib.set_song_tags(song_id, &json).map_err(map_err)
 }
 
-/// 批量增强曲库图片谱：结果写入 app_data/enhanced/{song_id}.png（不改原图）
+/// 批量增强曲库图片谱：async，避免卡 UI
 #[tauri::command]
-pub fn batch_enhance_images(
+pub async fn batch_enhance_images(
     state: State<'_, LibraryState>,
     preset: Option<String>,
 ) -> Result<Vec<EnhancePreviewDto>, String> {
