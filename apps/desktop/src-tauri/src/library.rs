@@ -424,18 +424,6 @@ impl Library {
         )?;
         Ok(())
     }
-
-    pub fn get_enhanced_path(&self, song_id: i64) -> Result<Option<String>, LibraryError> {
-        let p = self
-            .conn
-            .query_row(
-                "SELECT json_extract(meta, '$.enhancedPath') FROM image_asset WHERE song_id = ?1",
-                params![song_id],
-                |row| row.get(0),
-            )
-            .optional()?;
-        Ok(p)
-    }
 }
 
 /// 应用数据目录
