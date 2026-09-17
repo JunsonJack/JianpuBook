@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>W0 目录页码实测</title>
+<style>
+  @page { size: A4; margin: 18mm 15mm; }
+  html, body { margin: 0; padding: 0; }
+  body { font-family: sans-serif; font-size: 4mm; }
+  /* 关键：用 target-counter 让目录项自动带页码 */
+  .toc a { text-decoration: none; color: #000; }
+  .toc a::after { content: " " target-counter(attr(href), page); }
+  .sec { break-before: page; }
+</style>
+</head>
+<body>
+
+<!-- 目录页 -->
+<div class="toc">
+  <div><a href="#s01">歌曲 01</a></div>
+  <div><a href="#s02">歌曲 02</a></div>
+  <div><a href="#s03">歌曲 03</a></div>
+  <div><a href="#s04">歌曲 04</a></div>
+  <div><a href="#s05">歌曲 05</a></div>
+  <div><a href="#s06">歌曲 06</a></div>
+  <div><a href="#s07">歌曲 07</a></div>
+  <div><a href="#s08">歌曲 08</a></div>
+  <div><a href="#s09">歌曲 09</a></div>
+  <div><a href="#s10">歌曲 10</a></div>
+</div>
+
+<!-- 10 个曲目页 -->
+<div class="sec" id="s01">SEC01 歌曲 01 的内容</div>
+<div class="sec" id="s02">SEC02 歌曲 02 的内容</div>
+<div class="sec" id="s03">SEC03 歌曲 03 的内容</div>
+<div class="sec" id="s04">SEC04 歌曲 04 的内容</div>
+<div class="sec" id="s05">SEC05 歌曲 05 的内容</div>
+<div class="sec" id="s06">SEC06 歌曲 06 的内容</div>
+<div class="sec" id="s07">SEC07 歌曲 07 的内容</div>
+<div class="sec" id="s08">SEC08 歌曲 08 的内容</div>
+<div class="sec" id="s09">SEC09 歌曲 09 的内容</div>
+<div class="sec" id="s10">SEC10 歌曲 10 的内容</div>
+
+</body>
+</html>

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>W0 打印几何实测</title>
+<style>
+  @page { size: A4; margin: 0; }
+  html, body { margin: 0; padding: 0; }
+  body { font-family: sans-serif; }
+  .mk {
+    position: absolute;
+    font-size: 3mm;
+    line-height: 3mm;
+    background: #fff;
+    border: 0.2mm solid #000;
+    padding: 0;
+  }
+  /* 版心框：四边 10mm 内的 190x277mm 边框 */
+  #frame {
+    position: absolute;
+    left: 10mm; top: 10mm; width: 190mm; height: 277mm;
+    border: 0.2mm solid #000;
+  }
+  /* ---- 第 2 页起：break-inside 测试 ---- */
+  .block {
+    break-inside: avoid;
+    height: 240mm;
+    border: 0.5mm solid #000;
+    font-size: 6mm;
+  }
+  .pagebreak { break-after: page; }
+</style>
+</head>
+<body>
+
+<!-- 第 1 页：几何标记。标签 = M<横mm>x<纵mm>，表示该处应有的坐标 -->
+<div id="frame"></div>
+<div class="mk" style="left:10mm;  top:10mm;">M10x10</div>
+<div class="mk" style="left:200mm; top:10mm;">M200x10</div>
+<div class="mk" style="left:25mm;  top:40mm;">M25x40</div>
+<div class="mk" style="left:105mm; top:148mm;">M105x148</div>
+<div class="mk" style="left:75mm;  top:120mm;">M75x120</div>
+<div class="mk" style="left:125mm; top:180mm;">M125x180</div>
+<div class="mk" style="left:175mm; top:240mm;">M175x240</div>
+<div class="mk" style="left:10mm;  top:287mm;">M10x287</div>
+<div class="mk" style="left:199mm; top:287mm;">M199x287</div>
+
+<div class="pagebreak"></div>
+
+<!-- 第 2 页：3 个 240mm 高的块，break-inside:avoid -->
+<div class="block">BLOCK-A 240mm</div>
+<div class="block">BLOCK-B 240mm</div>
+<div class="block">BLOCK-C 240mm</div>
+
+</body>
+</html>

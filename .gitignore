@@ -1,0 +1,34 @@
+# Node
+node_modules/
+dist/
+*.local
+.vite/
+
+# Rust
+target/
+**/*.rs.bk
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.swp
+
+# App data / local artifacts
+*.db
+*.db-journal
+data/
+library/
+*.log
+
+# W0 heavy artifacts (keep source scripts + small test images)
+w0/out/
+w0/print/*.pdf
+w0/probe-rs/target/
