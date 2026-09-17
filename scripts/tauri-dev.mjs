@@ -60,11 +60,26 @@ execSync("npm run build -w @jianpubook/jianpu-engine", {
 freePort(1420);
 
 log("启动 tauri dev（Vite http://127.0.0.1:1420）…");
-const isWin = process.platform === "win32";
-const child = spawn(isWin ? "npx.cmd" : "npx", ["tauri", "dev"], {
+
+// Windows + Node 20+/26：spawn("npx.cmd") 会 EINVAL。
+// 直接用当前 node 跑本地 @tauri-apps/cli/tauri.js，绕过 npx.cmd。
+const tauriCli = join(root, "node_modules", "@tauri-apps", "cli", "tauri.js");
+if (!existsSync(tauriCli)) {
+  console.error(
+    "[jianpubook] 未找到 @tauri-apps/cli，请先在仓库根目录执行：npm install",
+  );
+  process.exit(1);
+}
+
+const child = spawn(process.execPath, [tauriCli, "dev"], {
   cwd: desktop,
   stdio: "inherit",
   env: process.env,
+});
+
+child.on("error", (err) => {
+  console.error("[jianpubook] 启动 tauri dev 失败:", err.message);
+  process.exit(1);
 });
 
 child.on("exit", (code) => {
