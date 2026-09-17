@@ -41,6 +41,8 @@ export interface BookSongItem {
   jianpuText?: string | null;
   /** convertFileSrc 后的展示 URL */
   displayUrl?: string | null;
+  /** 增强后图 URL（若已批量增强） */
+  enhancedUrl?: string | null;
 }
 
 export interface AssembledBook {
@@ -149,15 +151,19 @@ export function assembleBookHtml(
 
     if (item.type === "image") {
       const src = item.displayUrl || item.originalPath || "";
+      const enh = item.enhancedUrl || "";
+      const imgTag = enh
+        ? `<img src="${esc(enh)}" alt="${esc(item.title)}" />`
+        : `<img src="${esc(src)}" alt="${esc(item.title)}" />`;
       bodyParts.push(`
 <section class="page song image-song" data-song="${item.songId}">
   <header class="song-head">
     <span class="ord">${toc.length}.</span>
     <span class="title">${esc(item.title)}</span>
-    <span class="meta">${esc(item.key ?? "")} ${esc(item.meter ?? "")}</span>
+    <span class="meta">${esc(item.key ?? "")} ${esc(item.meter ?? "")}${enh ? " · 增强" : ""}</span>
   </header>
   <div class="image-wrap">
-    <img src="${esc(src)}" alt="${esc(item.title)}" />
+    ${imgTag}
   </div>
   <footer class="page-num">${startPage}</footer>
 </section>`);

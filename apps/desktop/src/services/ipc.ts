@@ -65,6 +65,7 @@ function normalize(raw: Record<string, unknown>): Song {
     updatedAt: String(raw.updatedAt ?? ""),
     thumbPath: (raw.thumbPath as string) ?? null,
     originalPath: (raw.originalPath as string) ?? null,
+    enhancedPath: (raw.enhancedPath as string) ?? null,
   };
 }
 

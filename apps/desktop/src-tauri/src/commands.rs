@@ -461,8 +461,12 @@ pub fn batch_enhance_images(
         if DynamicImage::ImageLuma8(out_img).save(&dest).is_err() {
             continue;
         }
+        let dest_str = dest.to_string_lossy().to_string();
+        if let Ok(lib) = state.library.lock() {
+            let _ = lib.set_enhanced_path(s.id, &dest_str);
+        }
         out.push(EnhancePreviewDto {
-            path: dest.to_string_lossy().to_string(),
+            path: dest_str,
             preset: preset.clone().unwrap_or_else(|| "standard".into()),
             elapsed_ms,
             ink_ratio,

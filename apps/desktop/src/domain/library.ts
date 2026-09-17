@@ -19,6 +19,7 @@ export interface Song {
   updatedAt: string;
   thumbPath?: string | null;
   originalPath?: string | null;
+  enhancedPath?: string | null;
 }
 
 export interface ImageAsset {

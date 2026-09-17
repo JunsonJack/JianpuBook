@@ -65,7 +65,14 @@ async function refreshItems() {
     return;
   }
   items.value = await listBookItems(activeBookId.value);
+  library.value = await listSongs();
   rebuildPreview();
+}
+
+function enhancedUrlFor(songId: number): string | null {
+  const s = library.value.find((x) => x.id === songId);
+  if (s?.enhancedPath) return convertFileSrc(s.enhancedPath);
+  return null;
 }
 
 function rebuildPreview() {
@@ -84,6 +91,7 @@ function rebuildPreview() {
     originalPath: it.originalPath,
     jianpuText: it.jianpuText,
     displayUrl: it.originalPath ? convertFileSrc(it.originalPath) : null,
+    enhancedUrl: enhancedUrlFor(it.songId),
   }));
   const title = activeBook.value?.title ?? newTitle.value;
   const assembled = assembleBookHtml(title, mapped, pageSetup.value, theme.value);

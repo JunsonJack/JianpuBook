@@ -40,6 +40,8 @@ pub struct SongDto {
     pub thumb_path: Option<String>,
     #[serde(rename = "originalPath")]
     pub original_path: Option<String>,
+    #[serde(rename = "enhancedPath")]
+    pub enhanced_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -99,7 +101,8 @@ impl Library {
     pub fn list_songs(&self) -> Result<Vec<SongDto>, LibraryError> {
         let mut stmt = self.conn.prepare(
             "SELECT s.id, s.type, s.title, s.key, s.meter, s.tempo, s.tags, s.stars, s.source,
-                    s.created_at, a.thumb_path, a.original_path
+                    s.created_at, a.thumb_path, a.original_path,
+                    json_extract(a.meta, '$.enhancedPath')
              FROM song s
              LEFT JOIN image_asset a ON a.song_id = s.id
              ORDER BY s.id DESC",
@@ -120,6 +123,7 @@ impl Library {
                 created_at: row.get(9)?,
                 thumb_path: row.get(10)?,
                 original_path: row.get(11)?,
+                enhanced_path: row.get(12)?,
             })
         })?;
         let mut out = Vec::new();
@@ -409,6 +413,28 @@ impl Library {
             params![song_id, tags_json],
         )?;
         Ok(())
+    }
+
+    /// 记录增强输出路径（非破坏性，原图路径不变）
+    pub fn set_enhanced_path(&self, song_id: i64, path: &str) -> Result<(), LibraryError> {
+        self.conn.execute(
+            "UPDATE image_asset SET meta = json_set(COALESCE(meta, '{}'), '$.enhancedPath', ?2)
+             WHERE song_id = ?1",
+            params![song_id, path],
+        )?;
+        Ok(())
+    }
+
+    pub fn get_enhanced_path(&self, song_id: i64) -> Result<Option<String>, LibraryError> {
+        let p = self
+            .conn
+            .query_row(
+                "SELECT json_extract(meta, '$.enhancedPath') FROM image_asset WHERE song_id = ?1",
+                params![song_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        Ok(p)
     }
 }
 
