@@ -6,6 +6,7 @@ import {
   transposeKey,
   transposeDegreeNote,
   transposeNoteAbsolute,
+  transposeJianpuText,
 } from '../src/transpose.js';
 
 describe('调号解析', () => {
@@ -32,7 +33,6 @@ describe('音级移调（主路径：数字照旧）', () => {
       digit: 1,
       acc: null,
     });
-    // 变化音记号也保留（相对音级）
     expect(transposeDegreeNote(4, 1, '1=C', '1=bB')).toMatchObject({
       digit: 4,
       acc: 1,
@@ -50,6 +50,22 @@ describe('音级移调（主路径：数字照旧）', () => {
     expect(semitonesToKey(10)).toBe('1=bB');
     expect(semitonesToKey(1)).toBe('1=bD');
     expect(semitonesToKey(1, 'sharp')).toBe('1=#C');
+  });
+});
+
+describe('JianpuText 音级移调（只改 K）', () => {
+  it('替换已有 K 行，数字行不动', () => {
+    const src = `T: 小星星\nK: 1=C\nM: 4/4\n\n1 1 5 5 | 6 6 5 - ||\n`;
+    const out = transposeJianpuText(src, '1=bB');
+    expect(out).toContain('K: 1=bB');
+    expect(out).toContain('1 1 5 5 | 6 6 5 - ||');
+    expect(out).not.toContain('K: 1=C');
+  });
+
+  it('无 K 时插入文件头', () => {
+    const out = transposeJianpuText('1 2 3 4 |', '1=G');
+    expect(out.startsWith('K: 1=G')).toBe(true);
+    expect(out).toContain('1 2 3 4 |');
   });
 });
 
@@ -78,16 +94,9 @@ describe('绝对音高保持移调', () => {
     });
   });
 
-  it('1=C 的 #1(C#) 移到 1=bB → 2（C# 相对 bB 是 2 级自然音？C#=Db≈bD=2 的降）', () => {
-    // C# 相对 Bb = +2 半音；Bb 调 2=C，C#=+1 → #2
-    // 等音：C#=Db，bB 调 bD = 降 2 级
+  it('1=C 的 #1(C#) 移到 1=bB → #2', () => {
     const r = transposeNoteAbsolute(1, 1, '1=C', '1=bB');
     expect(r).not.toBeNull();
-    // +2 semitones from Bb = C = degree 2 natural
-    // Wait: C# is +2 from Bb? Bb=0, C=2, C#=3. So rel=3.
-    // degree 2 natural = 2, delta=1 → #2
-    // degree 3 natural = 4, delta=11 → b3
-    // 优先 #2
     expect(r!.digit).toBe(2);
     expect(r!.acc).toBe(1);
   });

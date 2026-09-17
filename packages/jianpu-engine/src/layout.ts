@@ -486,13 +486,19 @@ export function layoutScoreFromOrdered(
       const endX =
         group[group.length - 1]!.x + group[group.length - 1]!.width - 6;
       const maxUnder = Math.max(...group.map((c) => c.underlines), 1);
-      beamSpans.push({
-        id,
-        startX,
-        endX,
-        y: 28 + (maxUnder - 1) * theme.underGap + 2,
-        level: 1,
-      });
+      // 与 svg 减时线 y 对齐：ny=18, uy=ny+noteSize/2+3+i*underGap
+      // noteSize 默认 18 → uy = 18+9+3+i*gap = 30+i*gap
+      const noteSize = theme.noteSize;
+      for (let lv = 1; lv <= maxUnder; lv += 1) {
+        const y = noteSize + noteSize / 2 + 3 + (lv - 1) * theme.underGap;
+        beamSpans.push({
+          id: id * 10 + lv,
+          startX,
+          endX,
+          y,
+          level: lv,
+        });
+      }
     }
     const height = theme.lineHeight + verseCount * theme.lyricLineHeight;
     layoutLines.push({

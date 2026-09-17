@@ -24,6 +24,7 @@ export {
   transposeDegreeNote,
   transposeNoteAbsolute,
   transposeNote,
+  transposeJianpuText,
 } from './transpose.js';
 export type { AbsoluteNote, DegreeTransposeResult } from './transpose.js';
 export { layoutScore, layoutScoreFromOrdered, defaultTheme } from './layout.js';

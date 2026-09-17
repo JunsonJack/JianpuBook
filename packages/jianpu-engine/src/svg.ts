@@ -177,11 +177,11 @@ export function renderSvg(layout: ScoreLayout): string {
       body.push(renderLyrics(cell, oy, theme));
     }
 
-    // 连音线（beam）：画在减时线位置，连接组内音符
+    // 连音线（beam）：与减时线对齐；十六分画两层
     for (const b of line.beams) {
-      if (b.level > 1) continue; // P0 画一层加粗即可
+      const w = b.level === 1 ? 1.6 : 1.2;
       body.push(
-        `<line x1="${b.startX}" y1="${oy + b.y}" x2="${b.endX}" y2="${oy + b.y}" stroke="#1c1b19" stroke-width="1.6"/>`,
+        `<line x1="${b.startX}" y1="${oy + b.y}" x2="${b.endX}" y2="${oy + b.y}" stroke="#1c1b19" stroke-width="${w}"/>`,
       );
     }
   }

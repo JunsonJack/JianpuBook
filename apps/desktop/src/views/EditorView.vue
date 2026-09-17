@@ -1,7 +1,20 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { analyze } from "@jianpubook/jianpu-engine";
+import { analyze, transposeJianpuText } from "@jianpubook/jianpu-engine";
 import { hasTauri, listSongs, importTextSong } from "@/services/ipc";
+
+const KEYS = [
+  "1=C",
+  "1=G",
+  "1=D",
+  "1=A",
+  "1=E",
+  "1=F",
+  "1=bB",
+  "1=bE",
+  "1=bA",
+  "1=bD",
+];
 
 const sample = `T: 小星星
 K: 1=C
@@ -82,6 +95,11 @@ function copyText() {
   status.value = "源码已复制";
 }
 
+function applyTranspose(toKey: string) {
+  text.value = transposeJianpuText(text.value, toKey);
+  status.value = `已移调到 ${toKey}（数字不变）`;
+}
+
 onMounted(refreshTextSongs);
 </script>
 
@@ -95,6 +113,13 @@ onMounted(refreshTextSongs);
       <div class="panel">
         <div class="row">
           <input v-model="title" class="title-input" placeholder="曲名" />
+          <label class="key-pick">
+            移调
+            <select @change="applyTranspose(($event.target as HTMLSelectElement).value)">
+              <option value="">—</option>
+              <option v-for="k in KEYS" :key="k" :value="k">{{ k }}</option>
+            </select>
+          </label>
           <button class="btn" @click="saveToLibrary">存入曲库</button>
           <button class="btn ghost" @click="copyText">复制源码</button>
         </div>
@@ -134,6 +159,20 @@ onMounted(refreshTextSongs);
   gap: 8px;
   margin-bottom: 10px;
   align-items: center;
+  flex-wrap: wrap;
+}
+.key-pick {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.key-pick select {
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
 }
 .title-input {
   flex: 1;

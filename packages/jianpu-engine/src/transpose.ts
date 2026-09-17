@@ -116,3 +116,23 @@ export function transposeNoteAbsolute(
 
 /** @deprecated 使用 transposeNoteAbsolute */
 export const transposeNote = transposeNoteAbsolute;
+
+/**
+ * 音级移调（主路径）：只改 `K:` 行，数字不动。
+ * 若文本无 K: 行，则在文件头插入。
+ */
+export function transposeJianpuText(text: string, toKey: string): string {
+  const lines = text.split(/\r?\n/);
+  let replaced = false;
+  const out = lines.map((line) => {
+    if (/^K:\s*/.test(line.trim()) || /^K:/.test(line)) {
+      replaced = true;
+      return `K: ${toKey}`;
+    }
+    return line;
+  });
+  if (!replaced) {
+    out.unshift(`K: ${toKey}`);
+  }
+  return out.join('\n');
+}
