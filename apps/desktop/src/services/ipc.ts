@@ -238,6 +238,12 @@ export async function updateSongText(
   await invoke("update_song_text", { songId, jianpuText });
 }
 
+export async function seedDemo(): Promise<number> {
+  const invoke = getInvoke();
+  if (!invoke) throw new Error("需要 Tauri");
+  return invoke<number>("seed_demo");
+}
+
 export async function batchEnhanceImages(
   preset: EnhancePresetId = "standard",
 ): Promise<EnhancePreviewResult[]> {

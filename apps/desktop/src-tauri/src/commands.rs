@@ -540,6 +540,27 @@ pub fn reveal_path(path: String) -> Result<(), String> {
     }
     Ok(())
 }
+
+/// 写入演示数据（小星星 + 示例册），便于首次体验
+#[tauri::command]
+pub fn seed_demo(state: State<'_, LibraryState>) -> Result<i64, String> {
+    let lib = state.library.lock().map_err(map_err)?;
+    let text = "T: 小星星\nK: 1=C\nM: 4/4\nQ: ♩=100\nS: 儿歌\n\n1 1 5 5 | 6 6 5 - |\n词: 一 闪 一 闪 亮 晶 晶 ~\n\n4 4 3 3 | 2 2 1 - ||\n词: 满 天 都 是 小 星 星 ~\n";
+    let sid = lib
+        .insert_text_song("小星星", Some("1=C"), Some("4/4"), text)
+        .map_err(map_err)?;
+    let text2 = "T: 6/8 摇篮\nK: 1=bB\nM: 6/8\n\n1_ 1_ 1_ 1_ 1_ 1_ | 2_ 2_ 2_ 2_ 2_ 2_ | 1. 1_ 1_ 1_ ||\n词: 睡 吧 睡 吧 我 亲 爱 的 ~ ~ ~ ~\n";
+    let sid2 = lib
+        .insert_text_song("6/8 摇篮", Some("1=bB"), Some("6/8"), text2)
+        .map_err(map_err)?;
+    let bid = lib
+        .create_book("示例简谱册", "{}", "classic")
+        .map_err(map_err)?;
+    lib.add_book_item(bid, sid).map_err(map_err)?;
+    lib.add_book_item(bid, sid2).map_err(map_err)?;
+    Ok(bid)
+}
+
 #[tauri::command]
 pub fn export_book_json(
     state: State<'_, LibraryState>,

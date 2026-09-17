@@ -9,6 +9,7 @@ import {
   importImages,
   importTextSong,
   listSongs,
+  seedDemo,
   setSongStars,
   setSongTags,
   type ImportImageResult,
@@ -117,6 +118,18 @@ function pickFiles() {
 function thumbSrc(s: Song): string | null {
   if (s.thumbPath) return convertFileSrc(s.thumbPath);
   return null;
+}
+
+async function seed() {
+  try {
+    await seedDemo();
+    await refresh();
+    books.value = await listBooks();
+    if (books.value.length) targetBookId.value = books.value[0]!.id;
+    bulkNote.value = "已写入示例曲目与册子";
+  } catch (e) {
+    error.value = String(e);
+  }
 }
 
 onMounted(async () => {
@@ -281,6 +294,7 @@ async function editTags(s: Song) {
         </button>
       </template>
       <span v-if="bulkNote" class="bulk-note">{{ bulkNote }}</span>
+      <button v-if="tauri" class="btn ghost" @click="seed">写入示例数据</button>
     </div>
 
     <div class="library-grid">
