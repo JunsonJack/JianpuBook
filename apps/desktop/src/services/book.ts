@@ -200,6 +200,14 @@ ${THEME_CSS[theme]}
   size: ${w} ${h};
   margin: ${m}mm;
 }
+@page :left {
+  margin-left: ${pageSetup.duplexMirror ? m + 4 : m}mm;
+  margin-right: ${m}mm;
+}
+@page :right {
+  margin-left: ${m}mm;
+  margin-right: ${pageSetup.duplexMirror ? m + 4 : m}mm;
+}
 * { box-sizing: border-box; }
 html, body {
   margin: 0;

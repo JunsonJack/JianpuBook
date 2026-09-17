@@ -12,7 +12,10 @@
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test:engine": "npm run test -w @jianpubook/jianpu-engine",
+    "test:desktop": "npm run test -w @jianpubook/desktop",
     "test:img": "cargo test --manifest-path crates/img-pipeline/Cargo.toml",
+    "test:app": "cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --lib",
+    "test:all": "npm run test:engine && npm run test:desktop && npm run test:img && npm run test:app",
     "dev:desktop": "npm run build -w @jianpubook/jianpu-engine && npm run dev -w @jianpubook/desktop",
     "tauri:dev": "npm run build -w @jianpubook/jianpu-engine && npm run tauri:dev -w @jianpubook/desktop",
     "tauri:build": "npm run build -w @jianpubook/jianpu-engine && npm run tauri:build -w @jianpubook/desktop"
