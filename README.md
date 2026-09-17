@@ -35,7 +35,7 @@ JianpuBook/
 ```bash
 npm install
 npm run test:all          # 引擎 + 桌面单测 + Rust 管线 + 曲库
-npm run tauri:dev         # 桌面开发（Vite 127.0.0.1:1420）
+npm run tauri:dev         # 桌面开发（自动清 1420 端口）
 ```
 
 纯前端（无 Rust IPC，曲库为 mock）：
@@ -43,6 +43,16 @@ npm run tauri:dev         # 桌面开发（Vite 127.0.0.1:1420）
 ```bash
 npm run dev:desktop
 ```
+
+### tauri:dev 常见报错
+
+| 现象 | 原因 | 处理 |
+|---|---|---|
+| `Port 1420/5173 is already in use` | 残留 Vite/Node | 已用 `scripts/tauri-dev.mjs` 自动清理；也可手动结束占用进程 |
+| `beforeDevCommand terminated` | 前端 dev 起不来 | 确认在**仓库根目录**执行 `npm run tauri:dev` |
+| 找不到 `tauri` / cargo | CLI 或 Rust 未装 | `npm i -D @tauri-apps/cli`；安装 Rust MSVC 工具链 |
+| 窗口空白 / IPC 失败 | devUrl 与 Vite 端口不一致 | 两者必须都是 `127.0.0.1:1420` |
+| 误提交 `vite.config.js` | 会遮住 `.ts` 配置 | 删除该文件（已 gitignore） |
 
 ## 产品路径
 

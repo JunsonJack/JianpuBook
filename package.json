@@ -17,7 +17,7 @@
     "test:app": "cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --lib",
     "test:all": "npm run test:engine && npm run test:desktop && npm run test:img && npm run test:app",
     "dev:desktop": "npm run build -w @jianpubook/jianpu-engine && npm run dev -w @jianpubook/desktop",
-    "tauri:dev": "npm run build -w @jianpubook/jianpu-engine && npm run tauri:dev -w @jianpubook/desktop",
+    "tauri:dev": "node scripts/tauri-dev.mjs",
     "tauri:build": "npm run build -w @jianpubook/jianpu-engine && npm run tauri:build -w @jianpubook/desktop"
   },
   "engines": {
