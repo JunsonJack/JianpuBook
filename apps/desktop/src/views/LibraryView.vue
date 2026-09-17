@@ -88,11 +88,6 @@ async function importDraft() {
   }
 }
 
-/** HTML File：Tauri 2 常无真实 path，只取 name 做展示 */
-function fileDisplayName(f: File): string {
-  return f.name;
-}
-
 async function importByPaths(paths: string[]) {
   if (paths.length === 0) return;
   importing.value = true;
