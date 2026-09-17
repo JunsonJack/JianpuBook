@@ -10,6 +10,7 @@ import {
   importTextSong,
   listSongs,
   setSongStars,
+  setSongTags,
   type ImportImageResult,
 } from "@/services/ipc";
 import { addBookItem, listBooks, type BookSummary } from "@/services/bookIpc";
@@ -195,6 +196,22 @@ async function bumpStars(s: Song) {
   }
 }
 
+async function editTags(s: Song) {
+  const cur = (s.tags || []).join(",");
+  const next = window.prompt("标签（逗号分隔）", cur);
+  if (next == null) return;
+  const tags = next
+    .split(/[,，\s]+/)
+    .map((t) => t.trim())
+    .filter(Boolean);
+  s.tags = tags;
+  try {
+    await setSongTags(s.id, tags);
+  } catch (e) {
+    error.value = String(e);
+  }
+}
+
 </script>
 
 <template>
@@ -302,6 +319,9 @@ async function bumpStars(s: Song) {
                 :title="'点击加星（当前 ' + s.stars + '）'"
               >
                 {{ "★".repeat(s.stars) }}{{ "☆".repeat(5 - s.stars) }}
+              </span>
+              <span class="tags" @click.stop="editTags(s)" title="点击编辑标签">
+                {{ (s.tags || []).join(" ") || "标签" }}
               </span>
             </div>
           </article>
@@ -435,6 +455,12 @@ async function bumpStars(s: Song) {
   color: #c9a227 !important;
   letter-spacing: 1px;
   user-select: none;
+}
+.tags {
+  cursor: pointer;
+  font-size: 11px !important;
+  color: var(--accent) !important;
+  opacity: 0.85;
 }
 .filters {
   display: flex;
