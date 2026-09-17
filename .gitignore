@@ -3,6 +3,11 @@ node_modules/
 dist/
 *.local
 .vite/
+*.tsbuildinfo
+
+# Vite/tsc emit next to configs
+apps/desktop/vite.config.js
+apps/desktop/vite.config.d.ts
 
 # Rust
 target/
