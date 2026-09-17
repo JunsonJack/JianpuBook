@@ -27,10 +27,27 @@ const draftText = ref("T: 未命名\nK: 1=C\nM: 4/4\n\n1 2 3 4 | 5 - - - ||\n");
 
 const fileInput = ref<HTMLInputElement | null>(null);
 const dragOver = ref(false);
+const filterText = ref("");
+const filterType = ref<"all" | "image" | "text">("all");
+const filterMinStars = ref(0);
 
 const imageCount = computed(
   () => songs.value.filter((s) => s.type === "image").length,
 );
+
+const filteredSongs = computed(() => {
+  const q = filterText.value.trim().toLowerCase();
+  return songs.value.filter((s) => {
+    if (filterType.value !== "all" && s.type !== filterType.value) return false;
+    if (s.stars < filterMinStars.value) return false;
+    if (!q) return true;
+    return (
+      s.title.toLowerCase().includes(q) ||
+      (s.tags || []).some((t) => t.toLowerCase().includes(q)) ||
+      (s.key ?? "").toLowerCase().includes(q)
+    );
+  });
+});
 
 async function refresh() {
   loading.value = true;
@@ -165,6 +182,22 @@ async function bumpStars(s: Song) {
       </ul>
     </div>
 
+    <div class="filters panel">
+      <input v-model="filterText" placeholder="搜索标题 / 标签 / 调号" />
+      <select v-model="filterType">
+        <option value="all">全部</option>
+        <option value="text">文本谱</option>
+        <option value="image">图片谱</option>
+      </select>
+      <select v-model.number="filterMinStars">
+        <option :value="0">星级不限</option>
+        <option :value="1">≥1 星</option>
+        <option :value="3">≥3 星</option>
+        <option :value="5">5 星</option>
+      </select>
+      <span class="count">{{ filteredSongs.length }} / {{ songs.length }}</span>
+    </div>
+
     <div class="library-grid">
       <div class="panel">
         <h2>曲目（{{ songs.length }}）</h2>
@@ -172,7 +205,7 @@ async function bumpStars(s: Song) {
         <p v-else-if="error" class="error-list">{{ error }}</p>
         <div v-else class="song-wall">
           <article
-            v-for="s in songs"
+            v-for="s in filteredSongs"
             :key="s.id"
             class="song-card"
             :class="{ clickable: s.type === 'text' }"
@@ -326,6 +359,30 @@ async function bumpStars(s: Song) {
   color: #c9a227 !important;
   letter-spacing: 1px;
   user-select: none;
+}
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 14px;
+  padding: 10px 12px;
+}
+.filters input,
+.filters select {
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 13px;
+}
+.filters input {
+  min-width: 180px;
+}
+.filters .count {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
 }
 h2 {
   margin: 0 0 12px;
