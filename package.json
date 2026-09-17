@@ -1,0 +1,20 @@
+{
+  "name": "jianpubook",
+  "private": true,
+  "version": "0.1.0",
+  "description": "简谱收集 · 清晰化 · 排版打印一体桌面工具",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "dev:desktop": "npm run dev -w @jianpubook/desktop",
+    "tauri:dev": "npm run tauri:dev -w @jianpubook/desktop"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
