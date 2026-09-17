@@ -9,10 +9,11 @@
 | 阶段 | 状态 |
 |---|---|
 | W0 调研定标 | ✅ 完成（`docs/W0-排版与增强实测.md`） |
-| jianpu-engine 解析器 | ✅ TS 移植，37 单测 |
+| jianpu-engine 解析器 | ✅ TS，46 单测 |
+| jianpu-engine SVG 渲染 | ✅ 音符/八度/减时线/连音/歌词/小节号 |
 | img-pipeline 增强/去重 | ✅ Rust 骨架，12 单测 |
-| 桌面端骨架 | 🚧 Vue 五页 + Tauri 2 壳 |
-| W1 曲库 / W2 增强 UI / W3 SVG 渲染 / W4 成册 / W5 打印 | 待做 |
+| 桌面端骨架 | 🚧 Vue 五页 + Tauri 2 壳 + 文本谱实时 SVG 预览 |
+| W1 曲库 / W2 增强 UI / W4 成册 / W5 打印 | 待做 |
 
 ## 仓库结构
 

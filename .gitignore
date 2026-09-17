@@ -37,3 +37,6 @@ library/
 w0/out/
 w0/print/*.pdf
 w0/probe-rs/target/
+
+# generated score previews (regenerate via scripts/preview-score.mjs)
+packages/jianpu-engine/__preview/

@@ -9,10 +9,10 @@ Q: ♩=100
 S: 儿歌
 
 1 1 5 5 | 6 6 5 - |
-词: 一 闪 一 闪 亮 晶 晶 ~ ~ ~ ~
+词: 一 闪 一 闪 亮 晶 晶 ~
 
 4 4 3 3 | 2 2 1 - ||
-词: 满 天 都 是 小 星 星 ~ ~ ~ ~
+词: 满 天 都 是 小 星 星 ~
 `;
 
 const text = ref(sample);
@@ -20,7 +20,7 @@ const text = ref(sample);
 const result = computed(() => {
   try {
     return analyze(text.value);
-  } catch (e) {
+  } catch {
     return null;
   }
 });
@@ -44,7 +44,9 @@ const beamSummary = computed(() => {
 <template>
   <div>
     <h1>文本谱编辑</h1>
-    <p class="hint">JianpuText 即时解析：小节时值校验 + 自动连音分组。后续接入 SVG 渲染预览。</p>
+    <p class="hint">
+      JianpuText 即时解析 → 校验 → SVG 谱面预览。数字 / 八度点 / 减时线 / 连音 / 歌词均已绘制。
+    </p>
     <div class="editor-layout">
       <div class="panel">
         <textarea v-model="text" class="jianpu" spellcheck="false" />
@@ -61,11 +63,30 @@ const beamSummary = computed(() => {
           <span class="badge">{{ result?.song.headers.K ?? "—" }}</span>
           <span>小节 {{ result?.validation.measures.length ?? 0 }}</span>
           <span>歌词段 {{ result?.song.lyrics.length ?? 0 }}</span>
+          <span class="badge">
+            {{ result?.validation.errors.length ? "校验有问题" : "校验通过" }}
+          </span>
         </div>
-        <p><strong>时值</strong>：{{ measureSummary || "—" }}</p>
-        <p><strong>连音组</strong>：{{ beamSummary || "无（全为四分及以上）" }}</p>
-        <p class="hint">校验状态：{{ result?.validation.errors.length ? "有问题" : "通过" }}</p>
+        <div class="score-preview" v-html="result?.svg ?? ''" />
+        <p class="hint">时值：{{ measureSummary || "—" }}</p>
+        <p class="hint">连音组：{{ beamSummary || "无" }}</p>
       </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+.score-preview {
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 8px;
+  margin-bottom: 12px;
+}
+.score-preview :deep(svg) {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+</style>
