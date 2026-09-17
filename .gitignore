@@ -12,6 +12,7 @@ apps/desktop/vite.config.d.ts
 # Rust
 target/
 **/*.rs.bk
+apps/desktop/src-tauri/target/
 
 # Python
 __pycache__/

@@ -1,5 +1,6 @@
 {
-  "name": "jianpubook",
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "JianpuBook",
   "version": "0.1.0",
   "identifier": "com.junson.jianpubook",
   "build": {
@@ -24,6 +25,6 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "icon": []
+    "icon": ["icons/128x128.png", "icons/icon.png", "icons/icon.ico"]
   }
 }
