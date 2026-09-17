@@ -46,6 +46,7 @@ pub fn run() {
             commands::export_book_json,
             commands::save_book_html,
             commands::reveal_path,
+            commands::batch_enhance_images,
         ])
         .run(tauri::generate_context!())
         .expect("error while running JianpuBook");

@@ -236,6 +236,33 @@ export async function updateSongText(
   await invoke("update_song_text", { songId, jianpuText });
 }
 
+export async function batchEnhanceImages(
+  preset: EnhancePresetId = "standard",
+): Promise<EnhancePreviewResult[]> {
+  const invoke = getInvoke();
+  if (!invoke) throw new Error("需要 Tauri");
+  const rows = await invoke<
+    {
+      path: string;
+      preset: string;
+      elapsed_ms: number;
+      ink_ratio: number;
+      used_sauvola: boolean;
+      width: number;
+      height: number;
+    }[]
+  >("batch_enhance_images", { preset });
+  return rows.map((r) => ({
+    path: r.path,
+    preset: r.preset,
+    elapsedMs: r.elapsed_ms,
+    inkRatio: r.ink_ratio,
+    usedSauvola: r.used_sauvola,
+    width: r.width,
+    height: r.height,
+  }));
+}
+
 export async function setSongStars(songId: number, stars: number): Promise<void> {
   const invoke = getInvoke();
   if (!invoke) return;

@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import type { Song } from "@/domain/library";
 import {
+  batchEnhanceImages,
   convertFileSrc,
   enhancePreview,
   hasTauri,
@@ -120,6 +121,23 @@ watch(preset, () => {
   if (filePath.value) void runEnhance();
 });
 
+const statusMsg = ref("");
+
+async function runBatch() {
+  if (!tauri) return;
+  busy.value = true;
+  error.value = "";
+  statusMsg.value = "";
+  try {
+    const results = await batchEnhanceImages(preset.value);
+    statusMsg.value = `已批量增强 ${results.length} 张，输出在应用数据目录 enhanced/`;
+  } catch (e) {
+    error.value = String(e);
+  } finally {
+    busy.value = false;
+  }
+}
+
 onMounted(async () => {
   await refreshLibrary();
   const pick = sessionStorage.getItem("jianpubook-enhance-pick");
@@ -182,7 +200,12 @@ onMounted(async () => {
       <button class="btn" :disabled="busy || !filePath || !tauri" @click="runEnhance">
         {{ busy ? "处理中…" : "重新增强" }}
       </button>
+      <button class="btn ghost" :disabled="busy || !tauri" @click="runBatch">
+        批量增强曲库图片
+      </button>
     </div>
+
+    <p v-if="statusMsg" class="ok-note">{{ statusMsg }}</p>
 
     <p v-if="error" class="error-list">{{ error }}</p>
     <p v-if="savedNote" class="ok-note">{{ savedNote }}</p>

@@ -414,6 +414,66 @@ pub fn set_song_tags(
     lib.set_song_tags(song_id, &json).map_err(map_err)
 }
 
+/// 批量增强曲库图片谱：结果写入 app_data/enhanced/{song_id}.png（不改原图）
+#[tauri::command]
+pub fn batch_enhance_images(
+    state: State<'_, LibraryState>,
+    preset: Option<String>,
+) -> Result<Vec<EnhancePreviewDto>, String> {
+    let lib = state.library.lock().map_err(map_err)?;
+    let songs = lib.list_songs().map_err(map_err)?;
+    drop(lib);
+
+    let params = match preset.as_deref() {
+        Some("light") => EnhancePreset::Light.params(),
+        Some("strong") => EnhancePreset::Strong.params(),
+        _ => EnhanceParams::default(),
+    };
+
+    let enh_dir = state.paths.data_dir.join("enhanced");
+    std::fs::create_dir_all(&enh_dir).map_err(map_err)?;
+
+    let mut out = Vec::new();
+    for s in songs.iter().filter(|s| s.song_type == "image") {
+        let Some(src) = s.original_path.as_deref() else {
+            continue;
+        };
+        let path = PathBuf::from(src);
+        if !path.is_file() {
+            continue;
+        }
+        let gray = match load_gray(&path) {
+            Ok(g) => g,
+            Err(_) => continue,
+        };
+        let t0 = std::time::Instant::now();
+        let out_img = enhance_gray(&gray, &params);
+        let elapsed_ms = t0.elapsed().as_millis() as u64;
+        let total = (out_img.width() as u64) * (out_img.height() as u64);
+        let ink = out_img.pixels().filter(|p| p.0[0] < 128).count() as u64;
+        let ink_ratio = if total == 0 {
+            0.0
+        } else {
+            ink as f64 / total as f64
+        };
+        let used_sauvola = params.binarize && ink_ratio > params.ink_fallback;
+        let dest = enh_dir.join(format!("{}.png", s.id));
+        if DynamicImage::ImageLuma8(out_img).save(&dest).is_err() {
+            continue;
+        }
+        out.push(EnhancePreviewDto {
+            path: dest.to_string_lossy().to_string(),
+            preset: preset.clone().unwrap_or_else(|| "standard".into()),
+            elapsed_ms,
+            ink_ratio,
+            used_sauvola,
+            width: gray.width(),
+            height: gray.height(),
+        });
+    }
+    Ok(out)
+}
+
 /// 导出册子 HTML 到用户选择的路径（或 app data）
 #[tauri::command]
 pub fn save_book_html(
