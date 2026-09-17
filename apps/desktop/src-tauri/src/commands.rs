@@ -75,42 +75,15 @@ fn find_near(hashes: &[(i64, u64)], candidate: u64) -> (Option<i64>, Option<i64>
     (best_dup, best_near, if min_d == u32::MAX { 0 } else { min_d })
 }
 
-fn import_one(state: &State<'_, LibraryState>, path: &Path) -> Result<ImportResult, String> {
+fn import_one_with_hash(
+    state: &State<'_, LibraryState>,
+    path: &Path,
+    hash: String,
+) -> Result<ImportResult, String> {
     let path_str = path.to_string_lossy().to_string();
     let title = title_from_path(path);
 
-    if !path.is_file() {
-        return Ok(ImportResult {
-            song_id: 0,
-            title,
-            path: path_str,
-            phash: None,
-            duplicate_of: None,
-            status: "error".into(),
-            message: Some("文件不存在".into()),
-            thumb_path: None,
-        });
-    }
-
-    let hash = match hash_file(path) {
-        Ok(h) => h,
-        Err(e) => {
-            return Ok(ImportResult {
-                song_id: 0,
-                title,
-                path: path_str,
-                phash: None,
-                duplicate_of: None,
-                status: "error".into(),
-                message: Some(format!("读图/哈希失败: {e}")),
-                thumb_path: None,
-            });
-        }
-    };
-
     let lib = state.library.lock().map_err(map_err)?;
-
-    // 精确 pHash 命中：跳过全量扫描
     if let Some(id) = lib.find_by_phash_exact(&hash).map_err(map_err)? {
         return Ok(ImportResult {
             song_id: id,
@@ -141,7 +114,6 @@ fn import_one(state: &State<'_, LibraryState>, path: &Path) -> Result<ImportResu
         });
     }
 
-    // 先写缩略图（用临时 id 文件名，入库后不改名——直接用路径 hash 文件名）
     let thumb_name = format!("{hash}.png");
     let thumb_path = state.paths.thumbs_dir().join(&thumb_name);
     let thumb_str = thumb_path.to_string_lossy().to_string();
@@ -173,28 +145,54 @@ fn import_one(state: &State<'_, LibraryState>, path: &Path) -> Result<ImportResu
     })
 }
 
-/// 批量导入图片（绝对路径或目录）。
+/// 批量导入图片（绝对路径或目录）。哈希并行，入库串行。
 #[tauri::command]
 pub fn import_images(
     state: State<'_, LibraryState>,
     paths: Vec<String>,
 ) -> Result<Vec<ImportResult>, String> {
-    let mut out = Vec::new();
+    use rayon::prelude::*;
+
+    let mut files: Vec<PathBuf> = Vec::new();
     for p in paths {
         let path = PathBuf::from(&p);
         if path.is_dir() {
             let entries = std::fs::read_dir(&path).map_err(map_err)?;
-            let mut files: Vec<PathBuf> = entries
+            let mut dir_files: Vec<PathBuf> = entries
                 .filter_map(|e| e.ok())
                 .map(|e| e.path())
                 .filter(|p| p.is_file() && is_image_ext(p))
                 .collect();
-            files.sort();
-            for f in files {
-                out.push(import_one(&state, &f)?);
-            }
+            dir_files.sort();
+            files.extend(dir_files);
         } else {
-            out.push(import_one(&state, &path)?);
+            files.push(path);
+        }
+    }
+
+    // 并行算哈希（CPU 重），DB 写入仍串行避免锁竞争
+    let hashed: Vec<(PathBuf, Result<String, String>)> = files
+        .par_iter()
+        .map(|p| {
+            let h = hash_file(p).map_err(|e| e.to_string());
+            (p.clone(), h)
+        })
+        .collect();
+
+    let mut out = Vec::new();
+    for (path, hash) in hashed {
+        match hash {
+            Ok(h) => out.push(import_one_with_hash(&state, &path, h)?),
+            Err(e) => out.push(ImportResult {
+                song_id: 0,
+                title: title_from_path(&path),
+                path: path.to_string_lossy().to_string(),
+                phash: None,
+                duplicate_of: None,
+                status: "error".into(),
+                message: Some(e),
+                thumb_path: None,
+            }),
         }
     }
     Ok(out)

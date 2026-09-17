@@ -20,6 +20,7 @@ img-pipeline = { path = "../../../crates/img-pipeline" }
 image = { version = "0.25", default-features = false, features = ["png"] }
 rusqlite = { version = "0.32", features = ["bundled"] }
 thiserror = "2"
+rayon = "1.10"
 
 [features]
 default = []
