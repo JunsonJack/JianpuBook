@@ -148,6 +148,41 @@ async function move(idx: number, dir: -1 | 1) {
   rebuildPreview();
 }
 
+const dragFrom = ref<number | null>(null);
+const dragOverIdx = ref<number | null>(null);
+
+function onDragStart(i: number, e: DragEvent) {
+  dragFrom.value = i;
+  e.dataTransfer?.setData("text/plain", String(i));
+  if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+}
+
+function onDragOver(i: number, e: DragEvent) {
+  e.preventDefault();
+  dragOverIdx.value = i;
+  if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+}
+
+async function onDrop(i: number, e: DragEvent) {
+  e.preventDefault();
+  const from = dragFrom.value;
+  dragFrom.value = null;
+  dragOverIdx.value = null;
+  if (from == null || from === i) return;
+  const list = [...items.value];
+  const [moved] = list.splice(from, 1);
+  if (!moved) return;
+  list.splice(i, 0, moved);
+  items.value = list;
+  if (activeBookId.value != null) {
+    await reorderBookItems(
+      activeBookId.value,
+      list.map((x) => x.songId),
+    );
+  }
+  rebuildPreview();
+}
+
 async function onThemeChange() {
   if (activeBookId.value == null) return;
   await setBookTheme(
@@ -327,7 +362,18 @@ onMounted(async () => {
         <div v-if="items.length" class="order panel">
           <h2>曲序（{{ items.length }}）</h2>
           <ol>
-            <li v-for="(it, i) in items" :key="it.songId">
+            <li
+              v-for="(it, i) in items"
+              :key="it.songId"
+              class="order-item"
+              :class="{ over: dragOverIdx === i }"
+              draggable="true"
+              @dragstart="onDragStart(i, $event)"
+              @dragover="onDragOver(i, $event)"
+              @drop="onDrop(i, $event)"
+              @dragend="dragOverIdx = null"
+            >
+              <span class="grip" title="拖拽排序">⋮⋮</span>
               <span class="t">{{ it.title }}</span>
               <span class="tag">{{ it.type === "text" ? "文本" : "图片" }}</span>
               <button class="btn tiny ghost" @click="move(i, -1)">↑</button>
@@ -471,6 +517,20 @@ onMounted(async () => {
   gap: 6px;
   padding: 4px 0;
   font-size: 13px;
+}
+.order-item {
+  border-radius: 6px;
+  padding: 4px 6px !important;
+  cursor: grab;
+}
+.order-item.over {
+  background: var(--accent-soft);
+  outline: 1px dashed var(--accent);
+}
+.grip {
+  color: var(--muted);
+  font-size: 11px;
+  user-select: none;
 }
 .order .t {
   flex: 1;
