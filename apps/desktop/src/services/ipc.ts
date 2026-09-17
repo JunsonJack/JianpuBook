@@ -173,6 +173,7 @@ export interface EnhancePreviewResult {
 export async function enhancePreview(
   path: string,
   preset: EnhancePresetId = "standard",
+  overrides?: Record<string, unknown>,
 ): Promise<EnhancePreviewResult> {
   const invoke = getInvoke();
   if (!invoke) throw new Error("需要 Tauri 环境");
@@ -184,7 +185,7 @@ export async function enhancePreview(
     used_sauvola: boolean;
     width: number;
     height: number;
-  }>("enhance_preview", { path, preset });
+  }>("enhance_preview", { path, preset, overrides: overrides ?? null });
   return {
     path: r.path,
     preset: r.preset,

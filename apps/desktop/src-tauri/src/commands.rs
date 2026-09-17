@@ -199,23 +199,52 @@ pub fn import_images(
 }
 
 /// 增强预览：返回生成的 PNG 路径 + 元信息
+/// preset: light|standard|strong；overrides 可覆盖 deskew/median/sharpen/binarize 等
 #[tauri::command]
 pub fn enhance_preview(
     path: String,
     preset: Option<String>,
+    overrides: Option<serde_json::Value>,
 ) -> Result<EnhancePreviewDto, String> {
     let src = PathBuf::from(&path);
     let gray = load_gray(&src).map_err(map_err)?;
-    let (params, preset_id) = match preset.as_deref() {
-        Some("light") => (EnhancePreset::Light.params(), "light"),
-        Some("strong") => (EnhancePreset::Strong.params(), "strong"),
-        _ => (EnhanceParams::default(), "standard"),
+    let mut params = match preset.as_deref() {
+        Some("light") => EnhancePreset::Light.params(),
+        Some("strong") => EnhancePreset::Strong.params(),
+        _ => EnhanceParams::default(),
     };
+    let preset_id = preset.unwrap_or_else(|| "standard".into());
+    if let Some(o) = overrides {
+        if let Some(v) = o.get("deskew").and_then(|x| x.as_bool()) {
+            params.deskew = v;
+        }
+        if let Some(v) = o.get("median").and_then(|x| x.as_u64()) {
+            params.median = v as u32;
+        }
+        if let Some(v) = o.get("sharpen").and_then(|x| x.as_f64()) {
+            params.sharpen = v as f32;
+        }
+        if let Some(v) = o.get("binarize").and_then(|x| x.as_bool()) {
+            params.binarize = v;
+        }
+        if let Some(v) = o.get("sauvolaWindow").and_then(|x| x.as_u64()) {
+            params.sauvola_window = v as u32;
+        }
+        if let Some(v) = o.get("sauvolaK").and_then(|x| x.as_f64()) {
+            params.sauvola_k = v;
+        }
+        if let Some(v) = o.get("inkFallback").and_then(|x| x.as_f64()) {
+            params.ink_fallback = v;
+        }
+        if let Some(v) = o.get("cropBorder").and_then(|x| x.as_bool()) {
+            params.crop_border = v;
+        }
+    }
     let t0 = std::time::Instant::now();
     let out_img = enhance_gray(&gray, &params);
     let elapsed_ms = t0.elapsed().as_millis() as u64;
-    // 墨量占比（二值后 <128）
-    let total = (out_img.width() as u64) * (out_img.height() as u64);
+    let (ow, oh) = out_img.dimensions();
+    let total = (ow as u64) * (oh as u64);
     let ink = out_img.pixels().filter(|p| p.0[0] < 128).count() as u64;
     let ink_ratio = if total == 0 { 0.0 } else { ink as f64 / total as f64 };
     let used_sauvola = params.binarize && ink_ratio > params.ink_fallback;
@@ -233,12 +262,12 @@ pub fn enhance_preview(
 
     Ok(EnhancePreviewDto {
         path: dest.to_string_lossy().to_string(),
-        preset: preset_id.into(),
+        preset: preset_id,
         elapsed_ms,
         ink_ratio,
         used_sauvola,
-        width: gray.width(),
-        height: gray.height(),
+        width: ow,
+        height: oh,
     })
 }
 
