@@ -235,3 +235,18 @@ export async function updateSongText(
   if (!invoke) return;
   await invoke("update_song_text", { songId, jianpuText });
 }
+
+export async function setSongStars(songId: number, stars: number): Promise<void> {
+  const invoke = getInvoke();
+  if (!invoke) return;
+  await invoke("set_song_stars", { songId, stars });
+}
+
+export async function setSongTags(
+  songId: number,
+  tags: string[],
+): Promise<void> {
+  const invoke = getInvoke();
+  if (!invoke) return;
+  await invoke("set_song_tags", { songId, tags });
+}

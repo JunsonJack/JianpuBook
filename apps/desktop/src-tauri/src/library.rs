@@ -393,6 +393,23 @@ impl Library {
         }
         Ok(())
     }
+
+    pub fn set_song_stars(&self, song_id: i64, stars: i64) -> Result<(), LibraryError> {
+        let s = stars.clamp(0, 5);
+        self.conn.execute(
+            "UPDATE song SET stars = ?2, updated_at = datetime('now') WHERE id = ?1",
+            params![song_id, s],
+        )?;
+        Ok(())
+    }
+
+    pub fn set_song_tags(&self, song_id: i64, tags_json: &str) -> Result<(), LibraryError> {
+        self.conn.execute(
+            "UPDATE song SET tags = ?2, updated_at = datetime('now') WHERE id = ?1",
+            params![song_id, tags_json],
+        )?;
+        Ok(())
+    }
 }
 
 /// 应用数据目录

@@ -9,6 +9,7 @@ import {
   importImages,
   importTextSong,
   listSongs,
+  setSongStars,
   type ImportImageResult,
 } from "@/services/ipc";
 
@@ -111,6 +112,16 @@ async function openInEditor(s: Song) {
   void router.push("/editor");
 }
 
+async function bumpStars(s: Song) {
+  const next = (s.stars + 1) % 6;
+  s.stars = next;
+  try {
+    await setSongStars(s.id, next);
+  } catch (e) {
+    error.value = String(e);
+  }
+}
+
 </script>
 
 <template>
@@ -176,6 +187,13 @@ async function openInEditor(s: Song) {
             <div class="song-meta">
               <strong>{{ s.title }}</strong>
               <span>{{ s.key ?? "—" }} · {{ s.meter ?? "—" }}</span>
+              <span
+                class="stars"
+                @click.stop="bumpStars(s)"
+                :title="'点击加星（当前 ' + s.stars + '）'"
+              >
+                {{ "★".repeat(s.stars) }}{{ "☆".repeat(5 - s.stars) }}
+              </span>
             </div>
           </article>
         </div>
@@ -302,6 +320,12 @@ async function openInEditor(s: Song) {
 }
 .song-meta span {
   color: var(--muted);
+}
+.stars {
+  cursor: pointer;
+  color: #c9a227 !important;
+  letter-spacing: 1px;
+  user-select: none;
 }
 h2 {
   margin: 0 0 12px;

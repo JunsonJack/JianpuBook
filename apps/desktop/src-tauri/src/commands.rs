@@ -393,6 +393,27 @@ pub fn update_song_text(
     lib.update_song_text(song_id, &jianpu_text).map_err(map_err)
 }
 
+#[tauri::command]
+pub fn set_song_stars(
+    state: State<'_, LibraryState>,
+    song_id: i64,
+    stars: i64,
+) -> Result<(), String> {
+    let lib = state.library.lock().map_err(map_err)?;
+    lib.set_song_stars(song_id, stars).map_err(map_err)
+}
+
+#[tauri::command]
+pub fn set_song_tags(
+    state: State<'_, LibraryState>,
+    song_id: i64,
+    tags: Vec<String>,
+) -> Result<(), String> {
+    let json = serde_json::to_string(&tags).map_err(map_err)?;
+    let lib = state.library.lock().map_err(map_err)?;
+    lib.set_song_tags(song_id, &json).map_err(map_err)
+}
+
 /// 导出 book.json（可再编辑）
 #[tauri::command]
 pub fn export_book_json(

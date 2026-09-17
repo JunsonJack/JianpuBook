@@ -41,6 +41,8 @@ pub fn run() {
             commands::list_book_items,
             commands::get_song_text,
             commands::update_song_text,
+            commands::set_song_stars,
+            commands::set_song_tags,
             commands::export_book_json,
         ])
         .run(tauri::generate_context!())
