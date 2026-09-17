@@ -12,6 +12,7 @@ import {
   setSongStars,
   type ImportImageResult,
 } from "@/services/ipc";
+import { addBookItem, listBooks, type BookSummary } from "@/services/bookIpc";
 
 const router = useRouter();
 
@@ -30,6 +31,10 @@ const dragOver = ref(false);
 const filterText = ref("");
 const filterType = ref<"all" | "image" | "text">("all");
 const filterMinStars = ref(0);
+const selectedIds = ref<Set<number>>(new Set());
+const books = ref<BookSummary[]>([]);
+const targetBookId = ref<number | null>(null);
+const bulkNote = ref("");
 
 const imageCount = computed(
   () => songs.value.filter((s) => s.type === "image").length,
@@ -113,7 +118,41 @@ function thumbSrc(s: Song): string | null {
   return null;
 }
 
-onMounted(refresh);
+onMounted(async () => {
+  await refresh();
+  if (tauri) {
+    try {
+      books.value = await listBooks();
+      if (books.value.length) targetBookId.value = books.value[0]!.id;
+    } catch {
+      /* ignore */
+    }
+  }
+});
+
+function toggleSelect(id: number, ev: MouseEvent) {
+  ev.stopPropagation();
+  if (selectedIds.value.has(id)) selectedIds.value.delete(id);
+  else selectedIds.value.add(id);
+  // 触发更新
+  selectedIds.value = new Set(selectedIds.value);
+}
+
+async function addSelectedToBook() {
+  if (targetBookId.value == null || selectedIds.value.size === 0) return;
+  let n = 0;
+  for (const id of selectedIds.value) {
+    try {
+      await addBookItem(targetBookId.value, id);
+      n += 1;
+    } catch (e) {
+      error.value = String(e);
+    }
+  }
+  selectedIds.value = new Set();
+  bulkNote.value = `已加入册子 #${targetBookId.value}：${n} 首`;
+}
+
 
 async function openInEditor(s: Song) {
   if (s.type === "text") {
@@ -213,6 +252,18 @@ async function bumpStars(s: Song) {
         <option :value="5">5 星</option>
       </select>
       <span class="count">{{ filteredSongs.length }} / {{ songs.length }}</span>
+      <template v-if="selectedIds.size">
+        <span class="bulk">已选 {{ selectedIds.size }}</span>
+        <select v-model="targetBookId">
+          <option v-for="b in books" :key="b.id" :value="b.id">
+            {{ b.title }}（{{ b.itemCount }}）
+          </option>
+        </select>
+        <button class="btn" :disabled="!targetBookId" @click="addSelectedToBook">
+          加入册子
+        </button>
+      </template>
+      <span v-if="bulkNote" class="bulk-note">{{ bulkNote }}</span>
     </div>
 
     <div class="library-grid">
@@ -225,10 +276,17 @@ async function bumpStars(s: Song) {
             v-for="s in filteredSongs"
             :key="s.id"
             class="song-card"
-            :class="{ clickable: true }"
+            :class="{ clickable: true, selected: selectedIds.has(s.id) }"
             :title="s.type === 'text' ? '打开编辑' : '打开增强'"
             @click="openInEditor(s)"
           >
+            <label class="pick" @click.stop>
+              <input
+                type="checkbox"
+                :checked="selectedIds.has(s.id)"
+                @click="toggleSelect(s.id, $event)"
+              />
+            </label>
             <div class="thumb">
               <img v-if="thumbSrc(s)" :src="thumbSrc(s)!" :alt="s.title" />
               <div v-else class="thumb-placeholder">
@@ -401,6 +459,30 @@ async function bumpStars(s: Song) {
   margin-left: auto;
   color: var(--muted);
   font-size: 12px;
+}
+.bulk {
+  font-size: 12px;
+  color: var(--accent);
+  font-weight: 600;
+}
+.bulk-note {
+  font-size: 12px;
+  color: var(--accent);
+}
+.song-card.selected {
+  outline: 2px solid var(--accent);
+}
+.pick {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 2;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 4px;
+  padding: 2px;
+}
+.song-card {
+  position: relative;
 }
 h2 {
   margin: 0 0 12px;
