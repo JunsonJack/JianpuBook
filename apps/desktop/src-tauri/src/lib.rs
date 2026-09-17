@@ -29,6 +29,19 @@ pub fn run() {
             commands::enhance_preview,
             commands::save_enhance_params,
             commands::load_enhance_params,
+            commands::create_book,
+            commands::list_books,
+            commands::get_book,
+            commands::delete_book,
+            commands::rename_book,
+            commands::set_book_theme,
+            commands::add_book_item,
+            commands::remove_book_item,
+            commands::reorder_book_items,
+            commands::list_book_items,
+            commands::get_song_text,
+            commands::update_song_text,
+            commands::export_book_json,
         ])
         .run(tauri::generate_context!())
         .expect("error while running JianpuBook");

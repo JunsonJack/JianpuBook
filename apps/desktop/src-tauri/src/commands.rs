@@ -246,3 +246,158 @@ pub fn load_enhance_params(
     let lib = state.library.lock().map_err(map_err)?;
     lib.load_enhance_params(song_id).map_err(map_err)
 }
+
+// ---- Books ----
+
+use crate::library::{BookDto, BookItemDto};
+
+#[tauri::command]
+pub fn create_book(
+    state: State<'_, LibraryState>,
+    title: String,
+    pagesetup: Option<String>,
+    theme: Option<String>,
+) -> Result<i64, String> {
+    let lib = state.library.lock().map_err(map_err)?;
+    lib.create_book(
+        &title,
+        pagesetup.as_deref().unwrap_or("{}"),
+        theme.as_deref().unwrap_or("classic"),
+    )
+    .map_err(map_err)
+}
+
+#[tauri::command]
+pub fn list_books(state: State<'_, LibraryState>) -> Result<Vec<BookDto>, String> {
+    let lib = state.library.lock().map_err(map_err)?;
+    lib.list_books().map_err(map_err)
+}
+
+#[tauri::command]
+pub fn get_book(
+    state: State<'_, LibraryState>,
+    book_id: i64,
+) -> Result<Option<BookDto>, String> {
+    let lib = state.library.lock().map_err(map_err)?;
+    lib.get_book(book_id).map_err(map_err)
+}
+
+#[tauri::command]
+pub fn delete_book(state: State<'_, LibraryState>, book_id: i64) -> Result<(), String> {
+    let lib = state.library.lock().map_err(map_err)?;
+    lib.delete_book(book_id).map_err(map_err)
+}
+
+#[tauri::command]
+pub fn rename_book(
+    state: State<'_, LibraryState>,
+    book_id: i64,
+    title: String,
+) -> Result<(), String> {
+    let lib = state.library.lock().map_err(map_err)?;
+    lib.rename_book(book_id, &title).map_err(map_err)
+}
+
+#[tauri::command]
+pub fn set_book_theme(
+    state: State<'_, LibraryState>,
+    book_id: i64,
+    theme: String,
+    pagesetup: String,
+) -> Result<(), String> {
+    let lib = state.library.lock().map_err(map_err)?;
+    lib.set_book_theme(book_id, &theme, &pagesetup).map_err(map_err)
+}
+
+#[tauri::command]
+pub fn add_book_item(
+    state: State<'_, LibraryState>,
+    book_id: i64,
+    song_id: i64,
+) -> Result<i64, String> {
+    let lib = state.library.lock().map_err(map_err)?;
+    lib.add_book_item(book_id, song_id).map_err(map_err)
+}
+
+#[tauri::command]
+pub fn remove_book_item(
+    state: State<'_, LibraryState>,
+    book_id: i64,
+    song_id: i64,
+) -> Result<(), String> {
+    let lib = state.library.lock().map_err(map_err)?;
+    lib.remove_book_item(book_id, song_id).map_err(map_err)
+}
+
+#[tauri::command]
+pub fn reorder_book_items(
+    state: State<'_, LibraryState>,
+    book_id: i64,
+    song_ids: Vec<i64>,
+) -> Result<(), String> {
+    let lib = state.library.lock().map_err(map_err)?;
+    lib.reorder_book_items(book_id, &song_ids).map_err(map_err)
+}
+
+#[tauri::command]
+pub fn list_book_items(
+    state: State<'_, LibraryState>,
+    book_id: i64,
+) -> Result<Vec<BookItemDto>, String> {
+    let lib = state.library.lock().map_err(map_err)?;
+    lib.list_book_items(book_id).map_err(map_err)
+}
+
+#[tauri::command]
+pub fn get_song_text(
+    state: State<'_, LibraryState>,
+    song_id: i64,
+) -> Result<Option<String>, String> {
+    let lib = state.library.lock().map_err(map_err)?;
+    lib.get_song_text(song_id).map_err(map_err)
+}
+
+#[tauri::command]
+pub fn update_song_text(
+    state: State<'_, LibraryState>,
+    song_id: i64,
+    jianpu_text: String,
+) -> Result<(), String> {
+    let lib = state.library.lock().map_err(map_err)?;
+    lib.update_song_text(song_id, &jianpu_text).map_err(map_err)
+}
+
+/// 导出 book.json（可再编辑）
+#[tauri::command]
+pub fn export_book_json(
+    state: State<'_, LibraryState>,
+    book_id: i64,
+) -> Result<String, String> {
+    let lib = state.library.lock().map_err(map_err)?;
+    let book = lib.get_book(book_id).map_err(map_err)?;
+    let Some(book) = book else {
+        return Err("册子不存在".into());
+    };
+    let items = lib.list_book_items(book_id).map_err(map_err)?;
+    let payload = serde_json::json!({
+        "format": "jianpubook.book",
+        "version": 1,
+        "book": {
+            "title": book.title,
+            "theme": book.theme,
+            "pagesetup": serde_json::from_str::<serde_json::Value>(&book.pagesetup)
+                .unwrap_or(serde_json::json!({})),
+        },
+        "items": items.iter().map(|it| serde_json::json!({
+            "songId": it.song_id,
+            "ord": it.ord,
+            "type": it.song_type,
+            "title": it.title,
+            "key": it.key,
+            "meter": it.meter,
+            "originalPath": it.original_path,
+            "jianpuText": it.jianpu_text,
+        })).collect::<Vec<_>>(),
+    });
+    Ok(payload.to_string())
+}

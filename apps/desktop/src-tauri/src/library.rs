@@ -55,6 +55,32 @@ pub struct ImportResult {
     pub thumb_path: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BookDto {
+    pub id: i64,
+    pub title: String,
+    pub pagesetup: String,
+    pub theme: String,
+    #[serde(rename = "itemCount")]
+    pub item_count: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BookItemDto {
+    #[serde(rename = "songId")]
+    pub song_id: i64,
+    pub ord: i64,
+    #[serde(rename = "type")]
+    pub song_type: String,
+    pub title: String,
+    pub key: Option<String>,
+    pub meter: Option<String>,
+    #[serde(rename = "originalPath")]
+    pub original_path: Option<String>,
+    #[serde(rename = "jianpuText")]
+    pub jianpu_text: Option<String>,
+}
+
 pub struct Library {
     conn: Connection,
 }
@@ -198,6 +224,175 @@ impl Library {
             .optional()?;
         Ok(p)
     }
+
+    // ---- Book ----
+
+    pub fn create_book(&self, title: &str, pagesetup_json: &str, theme: &str) -> Result<i64, LibraryError> {
+        self.conn.execute(
+            "INSERT INTO book (title, pagesetup, theme) VALUES (?1, ?2, ?3)",
+            params![title, pagesetup_json, theme],
+        )?;
+        Ok(self.conn.last_insert_rowid())
+    }
+
+    pub fn list_books(&self) -> Result<Vec<BookDto>, LibraryError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT b.id, b.title, b.pagesetup, b.theme,
+                    (SELECT COUNT(*) FROM book_item bi WHERE bi.book_id = b.id) AS n
+             FROM book b ORDER BY b.id DESC",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok(BookDto {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                pagesetup: row.get(2)?,
+                theme: row.get(3)?,
+                item_count: row.get::<_, i64>(4)?,
+            })
+        })?;
+        let mut out = Vec::new();
+        for r in rows {
+            out.push(r?);
+        }
+        Ok(out)
+    }
+
+    pub fn get_book(&self, book_id: i64) -> Result<Option<BookDto>, LibraryError> {
+        let b = self
+            .conn
+            .query_row(
+                "SELECT b.id, b.title, b.pagesetup, b.theme,
+                        (SELECT COUNT(*) FROM book_item bi WHERE bi.book_id = b.id)
+                 FROM book b WHERE b.id = ?1",
+                params![book_id],
+                |row| {
+                    Ok(BookDto {
+                        id: row.get(0)?,
+                        title: row.get(1)?,
+                        pagesetup: row.get(2)?,
+                        theme: row.get(3)?,
+                        item_count: row.get(4)?,
+                    })
+                },
+            )
+            .optional()?;
+        Ok(b)
+    }
+
+    pub fn delete_book(&self, book_id: i64) -> Result<(), LibraryError> {
+        self.conn
+            .execute("DELETE FROM book WHERE id = ?1", params![book_id])?;
+        Ok(())
+    }
+
+    pub fn rename_book(&self, book_id: i64, title: &str) -> Result<(), LibraryError> {
+        self.conn.execute(
+            "UPDATE book SET title = ?2, updated_at = datetime('now') WHERE id = ?1",
+            params![book_id, title],
+        )?;
+        Ok(())
+    }
+
+    pub fn set_book_theme(&self, book_id: i64, theme: &str, pagesetup_json: &str) -> Result<(), LibraryError> {
+        self.conn.execute(
+            "UPDATE book SET theme = ?2, pagesetup = ?3, updated_at = datetime('now') WHERE id = ?1",
+            params![book_id, theme, pagesetup_json],
+        )?;
+        Ok(())
+    }
+
+    pub fn add_book_item(&self, book_id: i64, song_id: i64) -> Result<i64, LibraryError> {
+        let max_ord: Option<i64> = self
+            .conn
+            .query_row(
+                "SELECT MAX(ord) FROM book_item WHERE book_id = ?1",
+                params![book_id],
+                |row| row.get(0),
+            )
+            .optional()?
+            .flatten();
+        let ord = max_ord.map(|m| m + 1).unwrap_or(0);
+        self.conn.execute(
+            "INSERT OR IGNORE INTO book_item (book_id, song_id, ord) VALUES (?1, ?2, ?3)",
+            params![book_id, song_id, ord],
+        )?;
+        Ok(ord)
+    }
+
+    pub fn remove_book_item(&self, book_id: i64, song_id: i64) -> Result<(), LibraryError> {
+        self.conn.execute(
+            "DELETE FROM book_item WHERE book_id = ?1 AND song_id = ?2",
+            params![book_id, song_id],
+        )?;
+        Ok(())
+    }
+
+    /// 按给定 song_id 顺序重排
+    pub fn reorder_book_items(&self, book_id: i64, song_ids: &[i64]) -> Result<(), LibraryError> {
+        for (i, sid) in song_ids.iter().enumerate() {
+            self.conn.execute(
+                "UPDATE book_item SET ord = ?3 WHERE book_id = ?1 AND song_id = ?2",
+                params![book_id, sid, i as i64],
+            )?;
+        }
+        Ok(())
+    }
+
+    pub fn list_book_items(&self, book_id: i64) -> Result<Vec<BookItemDto>, LibraryError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT bi.song_id, bi.ord, s.type, s.title, s.key, s.meter,
+                    a.original_path, t.jianpu_text
+             FROM book_item bi
+             JOIN song s ON s.id = bi.song_id
+             LEFT JOIN image_asset a ON a.song_id = s.id
+             LEFT JOIN song_text t ON t.song_id = s.id
+             WHERE bi.book_id = ?1
+             ORDER BY bi.ord ASC",
+        )?;
+        let rows = stmt.query_map(params![book_id], |row| {
+            Ok(BookItemDto {
+                song_id: row.get(0)?,
+                ord: row.get(1)?,
+                song_type: row.get(2)?,
+                title: row.get(3)?,
+                key: row.get(4)?,
+                meter: row.get(5)?,
+                original_path: row.get(6)?,
+                jianpu_text: row.get(7)?,
+            })
+        })?;
+        let mut out = Vec::new();
+        for r in rows {
+            out.push(r?);
+        }
+        Ok(out)
+    }
+
+    pub fn get_song_text(&self, song_id: i64) -> Result<Option<String>, LibraryError> {
+        let t = self
+            .conn
+            .query_row(
+                "SELECT jianpu_text FROM song_text WHERE song_id = ?1",
+                params![song_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        Ok(t)
+    }
+
+    pub fn update_song_text(&self, song_id: i64, jianpu_text: &str) -> Result<(), LibraryError> {
+        let n = self.conn.execute(
+            "UPDATE song_text SET jianpu_text = ?2 WHERE song_id = ?1",
+            params![song_id, jianpu_text],
+        )?;
+        if n == 0 {
+            self.conn.execute(
+                "INSERT INTO song_text (song_id, jianpu_text) VALUES (?1, ?2)",
+                params![song_id, jianpu_text],
+            )?;
+        }
+        Ok(())
+    }
 }
 
 /// 应用数据目录
@@ -250,6 +445,31 @@ mod tests {
         assert!(lib.find_by_phash_exact("0000000000000000").unwrap().is_none());
         let hashes = lib.all_hashes().unwrap();
         assert_eq!(hashes.len(), 1);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn book_crud_and_reorder() {
+        let (dir, lib) = temp_lib("book");
+        let s1 = lib
+            .insert_text_song("A", Some("1=C"), Some("4/4"), "1 2 3 4 |")
+            .unwrap();
+        let s2 = lib
+            .insert_text_song("B", Some("1=G"), Some("2/4"), "5 5 |")
+            .unwrap();
+        let bid = lib.create_book("我的册子", "{}", "classic").unwrap();
+        lib.add_book_item(bid, s1).unwrap();
+        lib.add_book_item(bid, s2).unwrap();
+        let items = lib.list_book_items(bid).unwrap();
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].song_id, s1);
+        lib.reorder_book_items(bid, &[s2, s1]).unwrap();
+        let items = lib.list_book_items(bid).unwrap();
+        assert_eq!(items[0].song_id, s2);
+        assert_eq!(items[0].title, "B");
+        assert!(items[1].jianpu_text.as_deref().unwrap().contains("1 2 3 4"));
+        lib.remove_book_item(bid, s2).unwrap();
+        assert_eq!(lib.list_book_items(bid).unwrap().len(), 1);
         let _ = std::fs::remove_dir_all(&dir);
     }
 }
