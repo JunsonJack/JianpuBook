@@ -12,6 +12,7 @@ import {
   removeBookItem,
   reorderBookItems,
   renameBook,
+  saveBookHtml,
   setBookTheme,
   type BookItemRow,
   type BookSummary,
@@ -179,6 +180,18 @@ async function onExport() {
   status.value = "已导出 book.json";
 }
 
+async function onExportHtml() {
+  if (!previewHtml.value || activeBookId.value == null) return;
+  const name = `${(activeBook.value?.title || "book").replace(/[\\/:*?"<>|]/g, "_")}.html`;
+  const blob = new Blob([previewHtml.value], { type: "text/html" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  status.value = "已下载册子 HTML，可用浏览器打印为 PDF";
+}
+
 function openPrintPreview() {
   if (!previewHtml.value) return;
   sessionStorage.setItem("jianpubook-book-html", previewHtml.value);
@@ -295,6 +308,9 @@ onMounted(async () => {
           </button>
           <button class="btn ghost" :disabled="!activeBookId" @click="onExport">
             导出 book.json
+          </button>
+          <button class="btn ghost" :disabled="!previewHtml" @click="onExportHtml">
+            下载 HTML
           </button>
         </div>
         <p v-if="status" class="ok">{{ status }}</p>

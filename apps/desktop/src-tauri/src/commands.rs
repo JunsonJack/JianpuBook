@@ -414,7 +414,39 @@ pub fn set_song_tags(
     lib.set_song_tags(song_id, &json).map_err(map_err)
 }
 
-/// 导出 book.json（可再编辑）
+/// 导出册子 HTML 到用户选择的路径（或 app data）
+#[tauri::command]
+pub fn save_book_html(
+    state: State<'_, LibraryState>,
+    path: String,
+    html: String,
+) -> Result<String, String> {
+    let dest = PathBuf::from(&path);
+    if let Some(parent) = dest.parent() {
+        std::fs::create_dir_all(parent).map_err(map_err)?;
+    }
+    std::fs::write(&dest, html).map_err(map_err)?;
+    let _ = &state;
+    Ok(dest.to_string_lossy().to_string())
+}
+
+/// 在系统默认程序中打开文件/目录
+#[tauri::command]
+pub fn reveal_path(path: String) -> Result<(), String> {
+    let p = PathBuf::from(&path);
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .arg(if p.is_dir() { p.as_os_str() } else { p.as_os_str() })
+            .spawn()
+            .map_err(map_err)?;
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = p;
+    }
+    Ok(())
+}
 #[tauri::command]
 pub fn export_book_json(
     state: State<'_, LibraryState>,

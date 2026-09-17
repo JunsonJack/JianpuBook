@@ -146,6 +146,18 @@ export async function exportBookJson(bookId: number): Promise<string> {
   return invoke<string>("export_book_json", { bookId });
 }
 
+export async function saveBookHtml(path: string, html: string): Promise<string> {
+  const invoke = getInvoke();
+  if (!invoke) throw new Error("需要 Tauri");
+  return invoke<string>("save_book_html", { path, html });
+}
+
+export async function revealPath(path: string): Promise<void> {
+  const invoke = getInvoke();
+  if (!invoke) return;
+  await invoke("reveal_path", { path });
+}
+
 export function bookIpcAvailable(): boolean {
   return hasTauri();
 }

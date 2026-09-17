@@ -44,6 +44,8 @@ pub fn run() {
             commands::set_song_stars,
             commands::set_song_tags,
             commands::export_book_json,
+            commands::save_book_html,
+            commands::reveal_path,
         ])
         .run(tauri::generate_context!())
         .expect("error while running JianpuBook");
