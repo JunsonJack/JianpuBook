@@ -100,6 +100,22 @@ describe('renderSvg', () => {
     expect(r.svg).toContain('♭');
   });
 
+  it('连续两条词行 → 多段歌词', () => {
+    const r = analyze(`M: 4/4
+
+1 1 5 5 | 6 6 5 - |
+词: 一 闪 一 闪 亮 晶 晶 ~
+词: A B C D E F G ~
+`);
+    const notes = r.layout.lines
+      .flatMap((l) => l.cells)
+      .filter((c) => c.noteIndex === 0);
+    // noteIndex 0 应有两段词
+    expect(notes[0]!.lyrics.length).toBeGreaterThanOrEqual(2);
+    expect(notes[0]!.lyrics[0]!.text).toBe('一');
+    expect(notes[0]!.lyrics[1]!.text).toBe('A');
+  });
+
   it('三连音画括号与 3', () => {
     const r = analyze(`M: 4/4\n\n(1_ 2_ 3_) 4 5 6 | 1 2 3 4 |`);
     expect(r.svg).toContain('>3<');
