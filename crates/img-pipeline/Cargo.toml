@@ -1,0 +1,17 @@
+[package]
+name = "img-pipeline"
+version = "0.1.0"
+edition = "2021"
+description = "JianpuBook 图片清晰化与去重管线（去偏/二值化/去噪/pHash）"
+license = "MIT"
+
+[lib]
+name = "img_pipeline"
+path = "src/lib.rs"
+
+[dependencies]
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "bmp", "gif"] }
+imageproc = "0.25"
+rayon = "1.10"
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
