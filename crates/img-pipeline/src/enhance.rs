@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::binarize::binarize;
 use crate::denoise::median;
 use crate::deskew::deskew;
+use crate::sharpen::{crop_border, unsharp};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EnhancePreset {
@@ -20,6 +21,8 @@ pub struct EnhanceParams {
     pub deskew: bool,
     /// median 窗口边长（奇数）；0 关闭。W0 默认 3
     pub median: u32,
+    /// 反锐化强度；0 关闭
+    pub sharpen: f32,
     pub binarize: bool,
     pub sauvola_window: u32,
     pub sauvola_k: f64,
@@ -32,6 +35,7 @@ impl Default for EnhanceParams {
         Self {
             deskew: true,
             median: 3,
+            sharpen: 0.8,
             binarize: true,
             sauvola_window: 51,
             sauvola_k: 0.5,
@@ -47,12 +51,14 @@ impl EnhancePreset {
             EnhancePreset::Light => EnhanceParams {
                 deskew: true,
                 median: 3,
+                sharpen: 0.4,
                 binarize: true,
                 ..EnhanceParams::default()
             },
             EnhancePreset::Standard => EnhanceParams::default(),
             EnhancePreset::Strong => EnhanceParams {
                 median: 5,
+                sharpen: 1.2,
                 ink_fallback: 0.12,
                 crop_border: true,
                 ..EnhanceParams::default()
@@ -62,6 +68,7 @@ impl EnhancePreset {
 }
 
 /// 对灰度图按参数增强。原图不被修改。
+/// 顺序：median → deskew → unsharp → binarize →（可选）裁白边
 pub fn enhance_gray(input: &GrayImage, params: &EnhanceParams) -> GrayImage {
     let mut img = input.clone();
     if params.median >= 3 {
@@ -70,8 +77,14 @@ pub fn enhance_gray(input: &GrayImage, params: &EnhanceParams) -> GrayImage {
     if params.deskew {
         img = deskew(&img);
     }
+    if params.sharpen > 0.0 {
+        img = unsharp(&img, params.sharpen, 1.0);
+    }
     if params.binarize {
         img = binarize(&img, params.sauvola_window, params.sauvola_k, params.ink_fallback).img;
+    }
+    if params.crop_border {
+        img = crop_border(&img, 8);
     }
     img
 }
