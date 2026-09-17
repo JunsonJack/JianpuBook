@@ -129,7 +129,15 @@ onMounted(async () => {
     sessionStorage.removeItem("jianpubook-edit-song");
   }
   await refreshTextSongs();
+  window.addEventListener("keydown", onKey);
 });
+
+function onKey(e: KeyboardEvent) {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+    e.preventDefault();
+    void saveToLibrary();
+  }
+}
 </script>
 
 <template>
