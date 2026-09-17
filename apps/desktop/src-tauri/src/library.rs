@@ -36,13 +36,23 @@ pub struct SongDto {
     pub source: Option<String>,
     #[serde(rename = "createdAt")]
     pub created_at: String,
+    #[serde(rename = "thumbPath")]
+    pub thumb_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImportResult {
     pub song_id: i64,
     pub title: String,
+    pub path: String,
+    pub phash: Option<String>,
+    /// None=新导入；Some(id)=判重/近重复
     pub duplicate_of: Option<i64>,
+    /// duplicate / near / new / error
+    pub status: String,
+    pub message: Option<String>,
+    #[serde(rename = "thumbPath")]
+    pub thumb_path: Option<String>,
 }
 
 pub struct Library {
@@ -62,8 +72,11 @@ impl Library {
 
     pub fn list_songs(&self) -> Result<Vec<SongDto>, LibraryError> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, type, title, key, meter, tempo, tags, stars, source, created_at
-             FROM song ORDER BY id DESC",
+            "SELECT s.id, s.type, s.title, s.key, s.meter, s.tempo, s.tags, s.stars, s.source,
+                    s.created_at, a.thumb_path
+             FROM song s
+             LEFT JOIN image_asset a ON a.song_id = s.id
+             ORDER BY s.id DESC",
         )?;
         let rows = stmt.query_map([], |row| {
             let tags_json: String = row.get(6)?;
@@ -79,6 +92,7 @@ impl Library {
                 stars: row.get(7)?,
                 source: row.get(8)?,
                 created_at: row.get(9)?,
+                thumb_path: row.get(10)?,
             })
         })?;
         let mut out = Vec::new();
@@ -112,15 +126,17 @@ impl Library {
         title: &str,
         original_path: &str,
         phash_hex: Option<&str>,
+        thumb_path: Option<&str>,
     ) -> Result<i64, LibraryError> {
         self.conn.execute(
-            "INSERT INTO song (type, title) VALUES ('image', ?1)",
-            params![title],
+            "INSERT INTO song (type, title, source) VALUES ('image', ?1, ?2)",
+            params![title, original_path],
         )?;
         let id = self.conn.last_insert_rowid();
         self.conn.execute(
-            "INSERT INTO image_asset (song_id, original_path, phash) VALUES (?1, ?2, ?3)",
-            params![id, original_path, phash_hex],
+            "INSERT INTO image_asset (song_id, original_path, thumb_path, phash)
+             VALUES (?1, ?2, ?3, ?4)",
+            params![id, original_path, thumb_path, phash_hex],
         )?;
         Ok(id)
     }
@@ -136,20 +152,57 @@ impl Library {
             .optional()?;
         Ok(id)
     }
+
+    /// 全量哈希，供汉明距离近邻搜索
+    pub fn all_hashes(&self) -> Result<Vec<(i64, u64)>, LibraryError> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT song_id, phash FROM image_asset WHERE phash IS NOT NULL")?;
+        let rows = stmt.query_map([], |row| {
+            let id: i64 = row.get(0)?;
+            let hex: String = row.get(1)?;
+            let v = u64::from_str_radix(hex.trim(), 16).unwrap_or(0);
+            Ok((id, v))
+        })?;
+        let mut out = Vec::new();
+        for r in rows {
+            out.push(r?);
+        }
+        Ok(out)
+    }
 }
 
-pub struct LibraryState(pub Mutex<Library>);
+/// 应用数据目录
+#[derive(Clone)]
+pub struct AppPaths {
+    pub data_dir: std::path::PathBuf,
+}
+
+impl AppPaths {
+    pub fn thumbs_dir(&self) -> std::path::PathBuf {
+        self.data_dir.join("thumbs")
+    }
+}
+
+pub struct LibraryState {
+    pub library: Mutex<Library>,
+    pub paths: AppPaths,
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    fn temp_lib(tag: &str) -> (std::path::PathBuf, Library) {
+        let dir = std::env::temp_dir().join(format!("jp-lib-{tag}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let lib = Library::open(&dir.join("t.db")).unwrap();
+        (dir, lib)
+    }
+
     #[test]
     fn open_and_insert_text() {
-        let dir = std::env::temp_dir().join(format!("jp-lib-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        let db = dir.join("t.db");
-        let lib = Library::open(&db).unwrap();
+        let (dir, lib) = temp_lib("text");
         let id = lib
             .insert_text_song("小星星", Some("1=C"), Some("4/4"), "1 1 5 5 |")
             .unwrap();
@@ -162,13 +215,13 @@ mod tests {
 
     #[test]
     fn image_hash_roundtrip() {
-        let dir = std::env::temp_dir().join(format!("jp-lib2-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        let lib = Library::open(&dir.join("t.db")).unwrap();
-        lib.insert_image_song("扫描谱", "D:/a.png", Some("deadbeefcafebabe"))
+        let (dir, lib) = temp_lib("img");
+        lib.insert_image_song("扫描谱", "D:/a.png", Some("deadbeefcafebabe"), None)
             .unwrap();
         assert!(lib.find_by_phash_exact("deadbeefcafebabe").unwrap().is_some());
         assert!(lib.find_by_phash_exact("0000000000000000").unwrap().is_none());
+        let hashes = lib.all_hashes().unwrap();
+        assert_eq!(hashes.len(), 1);
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

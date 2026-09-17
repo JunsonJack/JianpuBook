@@ -2182,6 +2182,7 @@ dependencies = [
 name = "jianpubook-desktop"
 version = "0.1.0"
 dependencies = [
+ "image",
  "img-pipeline",
  "rusqlite",
  "serde",

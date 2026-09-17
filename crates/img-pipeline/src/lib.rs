@@ -8,7 +8,10 @@ pub mod dedup;
 pub mod deskew;
 pub mod denoise;
 pub mod enhance;
+pub mod io;
 pub mod types;
 
+pub use dedup::{classify, hamming, perceptual_hash, DupClass, DUP_MAX, NEAR_MAX};
 pub use enhance::{enhance_gray, EnhanceParams, EnhancePreset};
+pub use io::{hash_file, load_gray, parse_hash_hex, write_thumbnail};
 pub use types::{BinaryImage, PipelineError};

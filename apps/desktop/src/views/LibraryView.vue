@@ -1,15 +1,31 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import type { Song } from "@/domain/library";
-import { hasTauri, importTextSong, listSongs } from "@/services/ipc";
+import {
+  convertFileSrc,
+  hasTauri,
+  importImages,
+  importTextSong,
+  listSongs,
+  type ImportImageResult,
+} from "@/services/ipc";
 
 const songs = ref<Song[]>([]);
 const loading = ref(false);
 const error = ref("");
+const importing = ref(false);
+const importLog = ref<ImportImageResult[]>([]);
 const tauri = hasTauri();
 
 const draftTitle = ref("未命名");
 const draftText = ref("T: 未命名\nK: 1=C\nM: 4/4\n\n1 2 3 4 | 5 - - - ||\n");
+
+const fileInput = ref<HTMLInputElement | null>(null);
+const dragOver = ref(false);
+
+const imageCount = computed(
+  () => songs.value.filter((s) => s.type === "image").length,
+);
 
 async function refresh() {
   loading.value = true;
@@ -37,6 +53,44 @@ async function importDraft() {
   }
 }
 
+/** HTML File 在 Tauri 下 path 可能是 web fake path；优先 webkitRelativePath / path */
+function filePathOf(f: File): string {
+  const anyF = f as File & { path?: string };
+  return anyF.path || (f as unknown as { webkitRelativePath?: string }).webkitRelativePath || f.name;
+}
+
+async function handleFiles(list: FileList | File[] | null) {
+  if (!list || list.length === 0) return;
+  const files = Array.from(list);
+  const paths = files.map(filePathOf).filter(Boolean);
+  if (paths.length === 0) return;
+  importing.value = true;
+  error.value = "";
+  try {
+    const results = await importImages(paths);
+    importLog.value = results;
+    await refresh();
+  } catch (e) {
+    error.value = String(e);
+  } finally {
+    importing.value = false;
+  }
+}
+
+function onDrop(e: DragEvent) {
+  dragOver.value = false;
+  void handleFiles(e.dataTransfer?.files ?? null);
+}
+
+function pickFiles() {
+  fileInput.value?.click();
+}
+
+function thumbSrc(s: Song): string | null {
+  if (s.thumbPath) return convertFileSrc(s.thumbPath);
+  return null;
+}
+
 onMounted(refresh);
 </script>
 
@@ -44,36 +98,62 @@ onMounted(refresh);
   <div>
     <h1>曲库</h1>
     <p class="hint">
-      本地曲目单一事实来源。
-      <span v-if="!tauri" class="badge">浏览器 mock 模式（启动 Tauri 后读 SQLite）</span>
-      <span v-else class="badge">Tauri IPC · SQLite</span>
+      本地曲目 ·
+      <span class="badge">{{ tauri ? "Tauri · SQLite" : "浏览器 mock" }}</span>
+      · 图片 {{ imageCount }} · pHash 去重（≤10 重复 / 11–14 近重复）
     </p>
+
+    <div
+      class="drop-zone"
+      :class="{ over: dragOver }"
+      @dragover.prevent="dragOver = true"
+      @dragleave.prevent="dragOver = false"
+      @drop.prevent="onDrop"
+    >
+      <p>拖入简谱图片（jpg/png/webp…）或文件夹内文件</p>
+      <button class="btn" :disabled="importing" @click="pickFiles">
+        {{ importing ? "导入中…" : "选择图片" }}
+      </button>
+      <input
+        ref="fileInput"
+        type="file"
+        accept="image/*"
+        multiple
+        class="hidden-input"
+        @change="handleFiles(($event.target as HTMLInputElement).files)"
+      />
+    </div>
+
+    <div v-if="importLog.length" class="panel import-log">
+      <h2>本次导入</h2>
+      <ul>
+        <li v-for="(r, i) in importLog" :key="i">
+          <span class="status" :class="r.status">{{ r.status }}</span>
+          {{ r.title }}
+          <span v-if="r.message" class="msg">{{ r.message }}</span>
+        </li>
+      </ul>
+    </div>
 
     <div class="library-grid">
       <div class="panel">
-        <h2>曲目</h2>
+        <h2>曲目（{{ songs.length }}）</h2>
         <p v-if="loading">加载中…</p>
         <p v-else-if="error" class="error-list">{{ error }}</p>
-        <table v-else class="song-table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>标题</th>
-              <th>类型</th>
-              <th>调号</th>
-              <th>拍号</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="s in songs" :key="s.id">
-              <td>{{ s.id }}</td>
-              <td>{{ s.title }}</td>
-              <td>{{ s.type === "text" ? "文本谱" : "图片谱" }}</td>
-              <td>{{ s.key ?? "—" }}</td>
-              <td>{{ s.meter ?? "—" }}</td>
-            </tr>
-          </tbody>
-        </table>
+        <div v-else class="song-wall">
+          <article v-for="s in songs" :key="s.id" class="song-card">
+            <div class="thumb">
+              <img v-if="thumbSrc(s)" :src="thumbSrc(s)!" :alt="s.title" />
+              <div v-else class="thumb-placeholder">
+                {{ s.type === "text" ? "谱" : "图" }}
+              </div>
+            </div>
+            <div class="song-meta">
+              <strong>{{ s.title }}</strong>
+              <span>{{ s.key ?? "—" }} · {{ s.meter ?? "—" }}</span>
+            </div>
+          </article>
+        </div>
       </div>
 
       <div class="panel">
@@ -84,30 +164,112 @@ onMounted(refresh);
         </label>
         <textarea v-model="draftText" class="jianpu" spellcheck="false" />
         <button class="btn" @click="importDraft">写入曲库</button>
-        <p class="hint">图片拖拽导入 / pHash 去重将在 W1 完整接入（Rust 管线已就绪）。</p>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
+.drop-zone {
+  border: 2px dashed var(--line);
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  margin-bottom: 16px;
+  background: var(--panel);
+  transition: border-color 0.15s, background 0.15s;
+}
+.drop-zone.over {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.hidden-input {
+  display: none;
+}
+.import-log {
+  margin-bottom: 16px;
+}
+.import-log ul {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+}
+.import-log li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+.status {
+  display: inline-block;
+  min-width: 56px;
+  margin-right: 8px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #eee;
+}
+.status.new {
+  background: #dcefe4;
+  color: #1d6b45;
+}
+.status.near {
+  background: #f5ecd0;
+  color: #8a6a12;
+}
+.status.duplicate {
+  background: #f0e0e0;
+  color: #8a2e2e;
+}
+.status.error {
+  background: #f0e0e0;
+  color: #8a2e2e;
+}
+.msg {
+  color: var(--muted);
+  margin-left: 8px;
+}
 .library-grid {
   display: grid;
-  grid-template-columns: 1.2fr 1fr;
+  grid-template-columns: 1.4fr 1fr;
   gap: 16px;
 }
-.song-table {
+.song-wall {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
+}
+.song-card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #faf9f6;
+}
+.thumb {
+  aspect-ratio: 3/4;
+  background: #eee;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.thumb img {
   width: 100%;
-  border-collapse: collapse;
+  height: 100%;
+  object-fit: contain;
 }
-.song-table th,
-.song-table td {
-  text-align: left;
+.thumb-placeholder {
+  color: var(--muted);
+  font-size: 28px;
+  font-weight: 700;
+}
+.song-meta {
   padding: 8px;
-  border-bottom: 1px solid var(--line);
-  font-size: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
 }
-.song-table th {
+.song-meta span {
   color: var(--muted);
 }
 h2 {
@@ -133,7 +295,8 @@ h2 {
   cursor: pointer;
   font-size: 14px;
 }
-.btn:hover {
-  filter: brightness(1.05);
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 </style>

@@ -1,4 +1,4 @@
-/** Tauri IPC 封装；无 Tauri 环境时回退到内存 mock，便于纯浏览器开发。 */
+/** Tauri IPC 封装；无 Tauri 环境时回退到内存 mock。 */
 
 import type { Song } from "@/domain/library";
 
@@ -9,9 +9,25 @@ function getInvoke(): InvokeFn | null {
     __TAURI_INTERNALS__?: { invoke: InvokeFn };
     __TAURI__?: { invoke: InvokeFn };
   };
-  if (w.__TAURI_INTERNALS__?.invoke) return w.__TAURI_INTERNALS__.invoke.bind(w.__TAURI_INTERNALS__);
+  if (w.__TAURI_INTERNALS__?.invoke)
+    return w.__TAURI_INTERNALS__.invoke.bind(w.__TAURI_INTERNALS__);
   if (w.__TAURI__?.invoke) return w.__TAURI__.invoke.bind(w.__TAURI__);
   return null;
+}
+
+export function hasTauri(): boolean {
+  return getInvoke() !== null;
+}
+
+export function convertFileSrc(path: string): string {
+  const w = window as unknown as {
+    __TAURI_INTERNALS__?: { convertFileSrc?: (p: string) => string };
+    __TAURI__?: { convertFileSrc?: (p: string) => string };
+  };
+  const fn =
+    w.__TAURI_INTERNALS__?.convertFileSrc ?? w.__TAURI__?.convertFileSrc;
+  if (fn) return fn(path);
+  return path;
 }
 
 const mockSongs: Song[] = [
@@ -27,6 +43,7 @@ const mockSongs: Song[] = [
     source: "内置示例",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    thumbPath: null,
   },
 ];
 
@@ -43,8 +60,9 @@ function normalize(raw: Record<string, unknown>): Song {
     tags: (raw.tags as string[]) ?? [],
     stars: Number(raw.stars ?? 0),
     source: (raw.source as string) ?? null,
-    createdAt: String(raw.createdAt ?? raw.created_at ?? ""),
-    updatedAt: String(raw.updatedAt ?? raw.updated_at ?? ""),
+    createdAt: String(raw.createdAt ?? ""),
+    updatedAt: String(raw.updatedAt ?? ""),
+    thumbPath: (raw.thumbPath as string) ?? null,
   };
 }
 
@@ -75,6 +93,7 @@ export async function importTextSong(input: {
       source: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      thumbPath: null,
     });
     return mockSeq;
   }
@@ -86,26 +105,61 @@ export async function importTextSong(input: {
   });
 }
 
-export async function importImageSong(input: {
+export interface ImportImageResult {
+  songId: number;
   title: string;
   path: string;
-  phash?: string;
-}): Promise<{ songId: number; duplicateOf: number | null }> {
-  const invoke = getInvoke();
-  if (!invoke) {
-    return { songId: -1, duplicateOf: null };
-  }
-  const r = await invoke<{ song_id: number; duplicate_of: number | null }>(
-    "import_image_song",
-    {
-      title: input.title,
-      path: input.path,
-      phash: input.phash ?? null,
-    },
-  );
-  return { songId: r.song_id, duplicateOf: r.duplicate_of };
+  phash: string | null;
+  duplicateOf: number | null;
+  status: "new" | "near" | "duplicate" | "error";
+  message: string | null;
+  thumbPath: string | null;
 }
 
-export function hasTauri(): boolean {
-  return getInvoke() !== null;
+export async function importImages(paths: string[]): Promise<ImportImageResult[]> {
+  const invoke = getInvoke();
+  if (!invoke) {
+    return paths.map((p) => ({
+      songId: -1,
+      title: p.split(/[\\/]/).pop() ?? p,
+      path: p,
+      phash: null,
+      duplicateOf: null,
+      status: "error" as const,
+      message: "浏览器 mock 模式无法读取本地文件，请启动 Tauri",
+      thumbPath: null,
+    }));
+  }
+  const rows = await invoke<
+    {
+      song_id: number;
+      title: string;
+      path: string;
+      phash: string | null;
+      duplicate_of: number | null;
+      status: string;
+      message: string | null;
+      thumbPath: string | null;
+    }[]
+  >("import_images", { paths });
+  return rows.map((r) => ({
+    songId: r.song_id,
+    title: r.title,
+    path: r.path,
+    phash: r.phash,
+    duplicateOf: r.duplicate_of,
+    status: r.status as ImportImageResult["status"],
+    message: r.message,
+    thumbPath: r.thumbPath,
+  }));
+}
+
+/** 通过系统对话框选文件（需要 dialog 插件时）；当前用 HTML input 路径 */
+export async function enhancePreview(
+  path: string,
+  preset: "light" | "standard" | "strong" = "standard",
+): Promise<string> {
+  const invoke = getInvoke();
+  if (!invoke) throw new Error("需要 Tauri 环境");
+  return invoke<string>("enhance_preview", { path, preset });
 }
