@@ -38,6 +38,8 @@ pub struct SongDto {
     pub created_at: String,
     #[serde(rename = "thumbPath")]
     pub thumb_path: Option<String>,
+    #[serde(rename = "originalPath")]
+    pub original_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -46,9 +48,7 @@ pub struct ImportResult {
     pub title: String,
     pub path: String,
     pub phash: Option<String>,
-    /// None=新导入；Some(id)=判重/近重复
     pub duplicate_of: Option<i64>,
-    /// duplicate / near / new / error
     pub status: String,
     pub message: Option<String>,
     #[serde(rename = "thumbPath")]
@@ -73,7 +73,7 @@ impl Library {
     pub fn list_songs(&self) -> Result<Vec<SongDto>, LibraryError> {
         let mut stmt = self.conn.prepare(
             "SELECT s.id, s.type, s.title, s.key, s.meter, s.tempo, s.tags, s.stars, s.source,
-                    s.created_at, a.thumb_path
+                    s.created_at, a.thumb_path, a.original_path
              FROM song s
              LEFT JOIN image_asset a ON a.song_id = s.id
              ORDER BY s.id DESC",
@@ -93,6 +93,7 @@ impl Library {
                 source: row.get(8)?,
                 created_at: row.get(9)?,
                 thumb_path: row.get(10)?,
+                original_path: row.get(11)?,
             })
         })?;
         let mut out = Vec::new();
@@ -169,6 +170,33 @@ impl Library {
             out.push(r?);
         }
         Ok(out)
+    }
+
+    /// 保存非破坏性增强参数
+    pub fn save_enhance_params(
+        &self,
+        song_id: i64,
+        params_json: &str,
+    ) -> Result<(), LibraryError> {
+        self.conn.execute(
+            "INSERT INTO enhance (song_id, params, updated_at)
+             VALUES (?1, ?2, datetime('now'))
+             ON CONFLICT(song_id) DO UPDATE SET params=excluded.params, updated_at=excluded.updated_at",
+            params![song_id, params_json],
+        )?;
+        Ok(())
+    }
+
+    pub fn load_enhance_params(&self, song_id: i64) -> Result<Option<String>, LibraryError> {
+        let p = self
+            .conn
+            .query_row(
+                "SELECT params FROM enhance WHERE song_id = ?1",
+                params![song_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        Ok(p)
     }
 }
 

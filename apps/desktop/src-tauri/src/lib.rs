@@ -27,6 +27,8 @@ pub fn run() {
             commands::import_text_song,
             commands::import_images,
             commands::enhance_preview,
+            commands::save_enhance_params,
+            commands::load_enhance_params,
         ])
         .run(tauri::generate_context!())
         .expect("error while running JianpuBook");

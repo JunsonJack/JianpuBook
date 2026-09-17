@@ -44,6 +44,7 @@ const mockSongs: Song[] = [
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     thumbPath: null,
+    originalPath: null,
   },
 ];
 
@@ -63,6 +64,7 @@ function normalize(raw: Record<string, unknown>): Song {
     createdAt: String(raw.createdAt ?? ""),
     updatedAt: String(raw.updatedAt ?? ""),
     thumbPath: (raw.thumbPath as string) ?? null,
+    originalPath: (raw.originalPath as string) ?? null,
   };
 }
 
@@ -94,6 +96,7 @@ export async function importTextSong(input: {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       thumbPath: null,
+      originalPath: null,
     });
     return mockSeq;
   }
@@ -154,12 +157,39 @@ export async function importImages(paths: string[]): Promise<ImportImageResult[]
   }));
 }
 
-/** 通过系统对话框选文件（需要 dialog 插件时）；当前用 HTML input 路径 */
+export type EnhancePresetId = "light" | "standard" | "strong";
+
 export async function enhancePreview(
   path: string,
-  preset: "light" | "standard" | "strong" = "standard",
+  preset: EnhancePresetId = "standard",
 ): Promise<string> {
   const invoke = getInvoke();
   if (!invoke) throw new Error("需要 Tauri 环境");
   return invoke<string>("enhance_preview", { path, preset });
+}
+
+export async function saveEnhanceParams(
+  songId: number,
+  params: Record<string, unknown>,
+): Promise<void> {
+  const invoke = getInvoke();
+  if (!invoke) return;
+  await invoke("save_enhance_params", {
+    songId,
+    paramsJson: JSON.stringify(params),
+  });
+}
+
+export async function loadEnhanceParams(
+  songId: number,
+): Promise<Record<string, unknown> | null> {
+  const invoke = getInvoke();
+  if (!invoke) return null;
+  const raw = await invoke<string | null>("load_enhance_params", { songId });
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
 }

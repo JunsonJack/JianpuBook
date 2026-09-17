@@ -226,3 +226,23 @@ pub fn enhance_preview(
         .map_err(map_err)?;
     Ok(dest.to_string_lossy().to_string())
 }
+
+/// 保存非破坏性增强参数（JSON 字符串）
+#[tauri::command]
+pub fn save_enhance_params(
+    state: State<'_, LibraryState>,
+    song_id: i64,
+    params_json: String,
+) -> Result<(), String> {
+    let lib = state.library.lock().map_err(map_err)?;
+    lib.save_enhance_params(song_id, &params_json).map_err(map_err)
+}
+
+#[tauri::command]
+pub fn load_enhance_params(
+    state: State<'_, LibraryState>,
+    song_id: i64,
+) -> Result<Option<String>, String> {
+    let lib = state.library.lock().map_err(map_err)?;
+    lib.load_enhance_params(song_id).map_err(map_err)
+}
