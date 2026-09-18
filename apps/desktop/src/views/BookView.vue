@@ -32,6 +32,7 @@ const library = ref<Song[]>([]);
 const newTitle = ref("我的简谱册");
 const theme = ref<BookTheme>("classic");
 const pageSetup = ref<PageSetup>({ ...defaultPageSetup });
+const imageScale = ref(1);
 const previewHtml = ref("");
 const pageCount = ref(0);
 const status = ref("");
@@ -92,6 +93,7 @@ function rebuildPreview() {
     jianpuText: it.jianpuText,
     displayUrl: it.originalPath ? convertFileSrc(it.originalPath) : null,
     enhancedUrl: enhancedUrlFor(it.songId),
+    imageScale: imageScale.value,
   }));
   const title = activeBook.value?.title ?? newTitle.value;
   const assembled = assembleBookHtml(title, mapped, pageSetup.value, theme.value);
@@ -294,6 +296,18 @@ onMounted(async () => {
             <option>Letter</option>
             <option>B5</option>
           </select>
+        </label>
+        <label>
+          图片缩放
+          <input
+            v-model.number="imageScale"
+            type="range"
+            min="0.5"
+            max="1"
+            step="0.05"
+            @change="rebuildPreview"
+          />
+          {{ Math.round(imageScale * 100) }}%
         </label>
         <label class="check">
           <input

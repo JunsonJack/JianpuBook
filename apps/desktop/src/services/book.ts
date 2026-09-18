@@ -39,10 +39,12 @@ export interface BookSongItem {
   meter?: string | null;
   originalPath?: string | null;
   jianpuText?: string | null;
-  /** convertFileSrc 后的展示 URL */
   displayUrl?: string | null;
-  /** 增强后图 URL（若已批量增强） */
   enhancedUrl?: string | null;
+  /** 单曲图片缩放 0.5–1，相对版心宽 */
+  imageScale?: number;
+  /** 是否新起一页（默认 true，预留） */
+  pageBreak?: boolean;
 }
 
 export interface AssembledBook {
@@ -156,9 +158,10 @@ export function assembleBookHtml(
     if (item.type === "image") {
       const src = item.displayUrl || item.originalPath || "";
       const enh = item.enhancedUrl || "";
+      const scale = Math.min(1, Math.max(0.4, item.imageScale ?? 1));
       const imgTag = enh
-        ? `<img src="${esc(enh)}" alt="${esc(item.title)}" />`
-        : `<img src="${esc(src)}" alt="${esc(item.title)}" />`;
+        ? `<img src="${esc(enh)}" alt="${esc(item.title)}" style="max-width:${(scale * 100).toFixed(0)}%" />`
+        : `<img src="${esc(src)}" alt="${esc(item.title)}" style="max-width:${(scale * 100).toFixed(0)}%" />`;
       bodyParts.push(`
 <section class="page song image-song" data-song="${item.songId}">
   <header class="song-head">
