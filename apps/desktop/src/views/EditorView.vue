@@ -39,8 +39,24 @@ const title = ref("小星星");
 const status = ref("");
 const error = ref("");
 const tauri = hasTauri();
-const libraryTextSongs = ref<{ id: number; title: string }[]>([]);
+const libraryTextSongs = ref<{ id: number; title: string; text?: string }[]>([]);
 const editSongId = ref<number | null>(null);
+const loadSongId = ref<number | null>(null);
+
+async function loadFromLibrary() {
+  if (loadSongId.value == null) return;
+  const { getSongText } = await import("@/services/ipc");
+  const body = await getSongText(loadSongId.value);
+  const hit = libraryTextSongs.value.find((s) => s.id === loadSongId.value);
+  if (body) {
+    text.value = body;
+    if (hit) title.value = hit.title;
+    editSongId.value = loadSongId.value;
+    status.value = `已载入 #${loadSongId.value}`;
+  } else {
+    error.value = "该曲目暂无文本谱源码";
+  }
+}
 
 const result = computed(() => {
   try {
@@ -150,6 +166,15 @@ function onKey(e: KeyboardEvent) {
       <div class="panel">
         <div class="row">
           <input v-model="title" class="title-input" placeholder="曲名" />
+          <label class="key-pick">
+            载入
+            <select v-model="loadSongId" @change="loadFromLibrary">
+              <option :value="null">—</option>
+              <option v-for="s in libraryTextSongs" :key="s.id" :value="s.id">
+                #{{ s.id }} {{ s.title }}
+              </option>
+            </select>
+          </label>
           <label class="key-pick">
             移调
             <select @change="applyTranspose(($event.target as HTMLSelectElement).value)">

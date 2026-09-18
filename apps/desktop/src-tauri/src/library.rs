@@ -487,6 +487,19 @@ mod tests {
     }
 
     #[test]
+    fn delete_song_cascades() {
+        let (dir, lib) = temp_lib("del");
+        let id = lib
+            .insert_text_song("待删", Some("1=C"), Some("4/4"), "1 2 3 4 |")
+            .unwrap();
+        assert_eq!(lib.list_songs().unwrap().len(), 1);
+        lib.delete_song(id).unwrap();
+        assert_eq!(lib.list_songs().unwrap().len(), 0);
+        assert!(lib.get_song_text(id).unwrap().is_none());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn book_crud_and_reorder() {
         let (dir, lib) = temp_lib("book");
         let s1 = lib
