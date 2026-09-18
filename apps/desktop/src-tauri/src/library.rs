@@ -81,6 +81,8 @@ pub struct BookItemDto {
     pub original_path: Option<String>,
     #[serde(rename = "jianpuText")]
     pub jianpu_text: Option<String>,
+    #[serde(rename = "overrideJson")]
+    pub override_json: Option<String>,
 }
 
 pub struct Library {
@@ -345,7 +347,7 @@ impl Library {
     pub fn list_book_items(&self, book_id: i64) -> Result<Vec<BookItemDto>, LibraryError> {
         let mut stmt = self.conn.prepare(
             "SELECT bi.song_id, bi.ord, s.type, s.title, s.key, s.meter,
-                    a.original_path, t.jianpu_text
+                    a.original_path, t.jianpu_text, bi.override
              FROM book_item bi
              JOIN song s ON s.id = bi.song_id
              LEFT JOIN image_asset a ON a.song_id = s.id
@@ -363,6 +365,7 @@ impl Library {
                 meter: row.get(5)?,
                 original_path: row.get(6)?,
                 jianpu_text: row.get(7)?,
+                override_json: row.get(8)?,
             })
         })?;
         let mut out = Vec::new();
@@ -370,6 +373,19 @@ impl Library {
             out.push(r?);
         }
         Ok(out)
+    }
+
+    pub fn set_book_item_override(
+        &self,
+        book_id: i64,
+        song_id: i64,
+        override_json: &str,
+    ) -> Result<(), LibraryError> {
+        self.conn.execute(
+            "UPDATE book_item SET override = ?3 WHERE book_id = ?1 AND song_id = ?2",
+            params![book_id, song_id, override_json],
+        )?;
+        Ok(())
     }
 
     pub fn get_song_text(&self, song_id: i64) -> Result<Option<String>, LibraryError> {

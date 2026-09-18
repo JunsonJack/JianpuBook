@@ -676,6 +676,18 @@ pub async fn batch_enhance_images(
     Ok(out)
 }
 
+#[tauri::command]
+pub fn set_book_item_override(
+    state: State<'_, LibraryState>,
+    book_id: i64,
+    song_id: i64,
+    override_json: String,
+) -> Result<(), String> {
+    let lib = state.library.lock().map_err(map_err)?;
+    lib.set_book_item_override(book_id, song_id, &override_json)
+        .map_err(map_err)
+}
+
 /// 导出册子 HTML 到用户选择的路径（或 app data）
 #[tauri::command]
 pub fn save_book_html(

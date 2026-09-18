@@ -13,6 +13,7 @@ import {
   reorderBookItems,
   renameBook,
   saveBookHtml,
+  setBookItemOverride,
   setBookTheme,
   type BookItemRow,
   type BookSummary,
@@ -82,19 +83,30 @@ function rebuildPreview() {
     pageCount.value = 0;
     return;
   }
-  const mapped = items.value.map((it) => ({
-    songId: it.songId,
-    ord: it.ord,
-    type: it.type,
-    title: it.title,
-    key: it.key,
-    meter: it.meter,
-    originalPath: it.originalPath,
-    jianpuText: it.jianpuText,
-    displayUrl: it.originalPath ? convertFileSrc(it.originalPath) : null,
-    enhancedUrl: enhancedUrlFor(it.songId),
-    imageScale: imageScale.value,
-  }));
+  const mapped = items.value.map((it) => {
+    let scale = imageScale.value;
+    try {
+      if (it.overrideJson) {
+        const o = JSON.parse(it.overrideJson) as { imageScale?: number };
+        if (typeof o.imageScale === "number") scale = o.imageScale;
+      }
+    } catch {
+      /* ignore */
+    }
+    return {
+      songId: it.songId,
+      ord: it.ord,
+      type: it.type,
+      title: it.title,
+      key: it.key,
+      meter: it.meter,
+      originalPath: it.originalPath,
+      jianpuText: it.jianpuText,
+      displayUrl: it.originalPath ? convertFileSrc(it.originalPath) : null,
+      enhancedUrl: enhancedUrlFor(it.songId),
+      imageScale: scale,
+    };
+  });
   const title = activeBook.value?.title ?? newTitle.value;
   const assembled = assembleBookHtml(title, mapped, pageSetup.value, theme.value);
   previewHtml.value = assembled.html;
@@ -241,6 +253,20 @@ function openPrintPreview() {
   if (!previewHtml.value) return;
   sessionStorage.setItem("jianpubook-book-html", previewHtml.value);
   location.hash = "#/print";
+}
+
+async function persistScale(songId: number) {
+  if (activeBookId.value == null) return;
+  try {
+    await setBookItemOverride(activeBookId.value, songId, {
+      imageScale: imageScale.value,
+    });
+    items.value = await listBookItems(activeBookId.value);
+    rebuildPreview();
+    status.value = `已保存曲目 #${songId} 缩放 ${Math.round(imageScale.value * 100)}%`;
+  } catch (e) {
+    error.value = String(e);
+  }
 }
 
 onMounted(async () => {
@@ -393,6 +419,14 @@ onMounted(async () => {
               <span class="tag">{{ it.type === "text" ? "文本" : "图片" }}</span>
               <button class="btn tiny ghost" @click="move(i, -1)">↑</button>
               <button class="btn tiny ghost" @click="move(i, 1)">↓</button>
+              <button
+                v-if="it.type === 'image'"
+                class="btn tiny ghost"
+                title="按当前缩放保存到本曲"
+                @click="persistScale(it.songId)"
+              >
+                缩放
+              </button>
               <button class="btn tiny danger" @click="onRemoveSong(it.songId)">
                 移除
               </button>

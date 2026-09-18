@@ -40,6 +40,7 @@ pub fn run() {
             commands::add_book_item,
             commands::remove_book_item,
             commands::reorder_book_items,
+            commands::set_book_item_override,
             commands::list_book_items,
             commands::get_song_text,
             commands::update_song_text,

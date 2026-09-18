@@ -32,6 +32,21 @@ export interface BookItemRow {
   meter: string | null;
   originalPath: string | null;
   jianpuText: string | null;
+  overrideJson?: string | null;
+}
+
+export async function setBookItemOverride(
+  bookId: number,
+  songId: number,
+  overrideObj: Record<string, unknown>,
+): Promise<void> {
+  const invoke = getInvoke();
+  if (!invoke) return;
+  await invoke("set_book_item_override", {
+    bookId,
+    songId,
+    overrideJson: JSON.stringify(overrideObj),
+  });
 }
 
 const mockBooks: BookSummary[] = [];
@@ -137,7 +152,14 @@ export async function reorderBookItems(
 export async function listBookItems(bookId: number): Promise<BookItemRow[]> {
   const invoke = getInvoke();
   if (!invoke) return [...(mockItems.get(bookId) ?? [])];
-  return invoke<BookItemRow[]>("list_book_items", { bookId });
+  const rows = await invoke<
+    (Omit<BookItemRow, "overrideJson"> & { overrideJson?: string | null })[]
+  >("list_book_items", { bookId });
+  return rows.map((r) => ({
+    ...r,
+    type: r.type as BookItemRow["type"],
+    overrideJson: r.overrideJson ?? null,
+  }));
 }
 
 export async function exportBookJson(bookId: number): Promise<string> {
