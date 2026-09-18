@@ -88,23 +88,22 @@ function esc(s: string): string {
 function estimateTextPages(item: BookSongItem, pageSetup: PageSetup): number {
   if (!item.jianpuText) return 1;
   try {
-    const r = analyze(item.jianpuText);
+    const r = analyze(item.jianpuText, undefined, { contentWidth: 900 } as RenderTheme);
     const { h } = paperSize(pageSetup.paper);
     const paperMm = parseFloat(h);
     const contentMm = Math.max(40, paperMm - pageSetup.marginMm * 2 - 18);
-    // SVG 默认坐标约 96 CSS px/inch
     const layoutMm = r.layout.height * (25.4 / 96);
-    // 标题头再加约 12mm
     return Math.max(1, Math.ceil((layoutMm + 12) / contentMm));
   } catch {
     return 1;
   }
 }
 
-function renderTextSongSvg(item: BookSongItem, theme?: RenderTheme): string {
+function renderTextSongSvg(item: BookSongItem): string {
   if (!item.jianpuText) return `<p class="empty">（无文本谱）</p>`;
   try {
-    const r = analyze(item.jianpuText, undefined, theme);
+    const wide = { contentWidth: 900, cellWidth: 26, noteSize: 18 } as RenderTheme;
+    const r = analyze(item.jianpuText, undefined, wide);
     return `<div class="score-svg">${r.svg}</div>`;
   } catch (e) {
     return `<p class="empty">解析失败：${esc(String(e))}</p>`;

@@ -75,7 +75,8 @@ export function analyze(
   const validation = validateMeasures(song.music, meter);
   const beams = beamGroups(validation.measures, meter);
   const parseErrors = collectErrors(song.music);
-  const layout = layoutScoreFromOrdered(ordered.lines, beams, theme);
+  const merged: RenderTheme = { ...defaultTheme, ...theme };
+  const layout = layoutScoreFromOrdered(ordered.lines, beams, merged);
   const svg = renderSvg(layout);
   return { song, validation, beams, parseErrors, layout, svg };
 }
