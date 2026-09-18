@@ -355,6 +355,7 @@ onMounted(async () => {
           <button class="btn ghost" :disabled="!previewHtml" @click="onExportHtml">
             下载 HTML
           </button>
+          <button class="btn ghost" @click="refreshItems">刷新预览</button>
         </div>
         <p v-if="status" class="ok">{{ status }}</p>
         <p v-if="error" class="error-list">{{ error }}</p>

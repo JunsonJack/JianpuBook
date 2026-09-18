@@ -82,14 +82,18 @@ function esc(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
-/** 粗估文本谱占几页：按 layout 行数与版心高度 */
-function estimateTextPages(item: BookSongItem): number {
+/** 文本谱页数估算：layout 高度（px@96dpi）换算 mm，按版心高度分页 */
+function estimateTextPages(item: BookSongItem, pageSetup: PageSetup): number {
   if (!item.jianpuText) return 1;
   try {
     const r = analyze(item.jianpuText);
-    // 约 10 行一页（含标题）
-    const lines = r.layout.lines.length;
-    return Math.max(1, Math.ceil((lines + 2) / 8));
+    const { h } = paperSize(pageSetup.paper);
+    const paperMm = parseFloat(h);
+    const contentMm = Math.max(40, paperMm - pageSetup.marginMm * 2 - 18);
+    // SVG 默认坐标约 96 CSS px/inch
+    const layoutMm = r.layout.height * (25.4 / 96);
+    // 标题头再加约 12mm
+    return Math.max(1, Math.ceil((layoutMm + 12) / contentMm));
   } catch {
     return 1;
   }
@@ -169,7 +173,7 @@ export function assembleBookHtml(
 </section>`);
       page += 1;
     } else {
-      const est = estimateTextPages(item);
+      const est = estimateTextPages(item, pageSetup);
       const svg = renderTextSongSvg(item);
       bodyParts.push(`
 <section class="page song text-song" data-song="${item.songId}">

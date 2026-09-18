@@ -7,7 +7,14 @@ use img_pipeline::{
 };
 use image::DynamicImage;
 use std::path::{Path, PathBuf};
-use tauri::State;
+use tauri::{Emitter, State};
+
+#[derive(Clone, serde::Serialize)]
+struct ImportProgress {
+    done: usize,
+    total: usize,
+    title: String,
+}
 
 fn map_err(e: impl std::fmt::Display) -> String {
     e.to_string()
@@ -166,9 +173,10 @@ fn import_one_with_hash(
     })
 }
 
-/// 批量导入图片（绝对路径或目录）。async：哈希在后台线程，避免卡 UI。
+/// 批量导入图片（绝对路径或目录）。async + 进度事件。
 #[tauri::command]
 pub async fn import_images(
+    app: tauri::AppHandle,
     state: State<'_, LibraryState>,
     paths: Vec<String>,
 ) -> Result<Vec<ImportResult>, String> {
@@ -191,7 +199,16 @@ pub async fn import_images(
         }
     }
 
-    // CPU 重：并行 pHash
+    let total = files.len();
+    let _ = app.emit(
+        "import:progress",
+        ImportProgress {
+            done: 0,
+            total,
+            title: "开始计算 pHash…".into(),
+        },
+    );
+
     let hashed: Vec<(PathBuf, Result<String, String>)> = files
         .par_iter()
         .map(|p| {
@@ -201,12 +218,21 @@ pub async fn import_images(
         .collect();
 
     let mut out = Vec::new();
-    for (path, hash) in hashed {
+    for (i, (path, hash)) in hashed.into_iter().enumerate() {
+        let title = title_from_path(&path);
+        let _ = app.emit(
+            "import:progress",
+            ImportProgress {
+                done: i,
+                total,
+                title: title.clone(),
+            },
+        );
         match hash {
             Ok(h) => out.push(import_one_with_hash(&state, &path, h)?),
             Err(e) => out.push(ImportResult {
                 song_id: 0,
-                title: title_from_path(&path),
+                title,
                 path: path.to_string_lossy().to_string(),
                 phash: None,
                 duplicate_of: None,
@@ -216,12 +242,21 @@ pub async fn import_images(
             }),
         }
     }
+    let _ = app.emit(
+        "import:progress",
+        ImportProgress {
+            done: total,
+            total,
+            title: "完成".into(),
+        },
+    );
     Ok(out)
 }
 
 /// 从内存字节导入（HTML file input / 拖拽无真实路径时）
 #[tauri::command]
 pub async fn import_images_from_bytes(
+    app: tauri::AppHandle,
     state: State<'_, LibraryState>,
     files: Vec<ByteFile>,
 ) -> Result<Vec<ImportResult>, String> {
@@ -230,8 +265,17 @@ pub async fn import_images_from_bytes(
     let staging = state.paths.data_dir.join("staging");
     std::fs::create_dir_all(&staging).map_err(map_err)?;
 
+    let total = files.len();
     let mut saved: Vec<PathBuf> = Vec::new();
     for (i, f) in files.iter().enumerate() {
+        let _ = app.emit(
+            "import:progress",
+            ImportProgress {
+                done: i,
+                total,
+                title: f.name.clone(),
+            },
+        );
         let safe = f
             .name
             .chars()
@@ -277,6 +321,14 @@ pub async fn import_images_from_bytes(
             }),
         }
     }
+    let _ = app.emit(
+        "import:progress",
+        ImportProgress {
+            done: total,
+            total,
+            title: "完成".into(),
+        },
+    );
     Ok(out)
 }
 

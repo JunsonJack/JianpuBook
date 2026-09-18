@@ -21,6 +21,7 @@ import {
   pickImageFolder,
 } from "@/services/filePick";
 import { addBookItem, listBooks, type BookSummary } from "@/services/bookIpc";
+import { onImportProgress } from "@/services/events";
 
 const router = useRouter();
 
@@ -43,6 +44,7 @@ const selectedIds = ref<Set<number>>(new Set());
 const books = ref<BookSummary[]>([]);
 const targetBookId = ref<number | null>(null);
 const bulkNote = ref("");
+const progress = ref<{ done: number; total: number; title: string } | null>(null);
 
 const imageCount = computed(
   () => songs.value.filter((s) => s.type === "image").length,
@@ -176,6 +178,14 @@ async function seed() {
 }
 
 onMounted(async () => {
+  await onImportProgress((p) => {
+    progress.value = p;
+    if (p.done >= p.total) {
+      setTimeout(() => {
+        progress.value = null;
+      }, 800);
+    }
+  });
   await refresh();
   if (tauri) {
     try {
@@ -286,13 +296,16 @@ async function editTags(s: Song) {
       @dragleave.prevent="dragOver = false"
       @drop.prevent="onDrop"
     >
-      <p>拖入简谱图片（jpg/png/webp…）或文件夹内文件</p>
+      <p>拖入简谱图片（jpg/png/webp…）或用系统对话框选择</p>
       <button class="btn" :disabled="importing" @click="pickFiles">
         {{ importing ? "导入中…" : "选择图片" }}
       </button>
       <button v-if="tauri" class="btn ghost" :disabled="importing" @click="pickFolder">
         选择文件夹
       </button>
+      <p v-if="progress" class="progress">
+        {{ progress.done }}/{{ progress.total }} · {{ progress.title }}
+      </p>
       <input
         ref="fileInput"
         type="file"
@@ -414,6 +427,11 @@ async function editTags(s: Song) {
 .drop-zone.over {
   border-color: var(--accent);
   background: var(--accent-soft);
+}
+.progress {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--accent);
 }
 .hidden-input {
   display: none;
