@@ -45,6 +45,7 @@ pub fn run() {
             commands::update_song_text,
             commands::set_song_stars,
             commands::set_song_tags,
+            commands::delete_song,
             commands::export_book_json,
             commands::save_book_html,
             commands::reveal_path,

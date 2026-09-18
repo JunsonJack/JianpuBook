@@ -12,6 +12,7 @@ import {
   type EnhancePresetId,
 } from "@/services/ipc";
 import { pickImageFiles } from "@/services/filePick";
+import { onImportProgress } from "@/services/events";
 
 const tauri = hasTauri();
 const imageSongs = ref<Song[]>([]);
@@ -168,6 +169,11 @@ async function runBatch() {
 }
 
 onMounted(async () => {
+  await onImportProgress((p) => {
+    if (p.title.startsWith("增强") || p.title.includes("增强")) {
+      statusMsg.value = `${p.done}/${p.total} · ${p.title}`;
+    }
+  });
   await refreshLibrary();
   const pick = sessionStorage.getItem("jianpubook-enhance-pick");
   if (pick) {

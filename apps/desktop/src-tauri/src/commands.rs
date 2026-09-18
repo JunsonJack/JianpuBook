@@ -582,15 +582,24 @@ pub fn set_song_tags(
     lib.set_song_tags(song_id, &json).map_err(map_err)
 }
 
-/// 批量增强曲库图片谱：async，避免卡 UI
+/// 删除曲目（不删磁盘上的原图文件）
+#[tauri::command]
+pub fn delete_song(state: State<'_, LibraryState>, song_id: i64) -> Result<(), String> {
+    let lib = state.library.lock().map_err(map_err)?;
+    lib.delete_song(song_id).map_err(map_err)
+}
+
+/// 批量增强曲库图片谱：async，带进度事件
 #[tauri::command]
 pub async fn batch_enhance_images(
+    app: tauri::AppHandle,
     state: State<'_, LibraryState>,
     preset: Option<String>,
 ) -> Result<Vec<EnhancePreviewDto>, String> {
-    let lib = state.library.lock().map_err(map_err)?;
-    let songs = lib.list_songs().map_err(map_err)?;
-    drop(lib);
+    let songs = {
+        let lib = state.library.lock().map_err(map_err)?;
+        lib.list_songs().map_err(map_err)?
+    };
 
     let params = match preset.as_deref() {
         Some("light") => EnhancePreset::Light.params(),
@@ -601,11 +610,23 @@ pub async fn batch_enhance_images(
     let enh_dir = state.paths.data_dir.join("enhanced");
     std::fs::create_dir_all(&enh_dir).map_err(map_err)?;
 
+    let targets: Vec<_> = songs
+        .iter()
+        .filter(|s| s.song_type == "image")
+        .filter_map(|s| s.original_path.as_deref().map(|p| (s.id, s.title.clone(), p)))
+        .collect();
+    let total = targets.len();
+
     let mut out = Vec::new();
-    for s in songs.iter().filter(|s| s.song_type == "image") {
-        let Some(src) = s.original_path.as_deref() else {
-            continue;
-        };
+    for (i, (id, title, src)) in targets.into_iter().enumerate() {
+        let _ = app.emit(
+            "import:progress",
+            ImportProgress {
+                done: i,
+                total,
+                title: format!("增强 {title}"),
+            },
+        );
         let path = PathBuf::from(src);
         if !path.is_file() {
             continue;
@@ -617,21 +638,22 @@ pub async fn batch_enhance_images(
         let t0 = std::time::Instant::now();
         let out_img = enhance_gray(&gray, &params);
         let elapsed_ms = t0.elapsed().as_millis() as u64;
-        let total = (out_img.width() as u64) * (out_img.height() as u64);
+        let (ow, oh) = out_img.dimensions();
+        let total_px = (ow as u64) * (oh as u64);
         let ink = out_img.pixels().filter(|p| p.0[0] < 128).count() as u64;
-        let ink_ratio = if total == 0 {
+        let ink_ratio = if total_px == 0 {
             0.0
         } else {
-            ink as f64 / total as f64
+            ink as f64 / total_px as f64
         };
         let used_sauvola = params.binarize && ink_ratio > params.ink_fallback;
-        let dest = enh_dir.join(format!("{}.png", s.id));
+        let dest = enh_dir.join(format!("{id}.png"));
         if DynamicImage::ImageLuma8(out_img).save(&dest).is_err() {
             continue;
         }
         let dest_str = dest.to_string_lossy().to_string();
         if let Ok(lib) = state.library.lock() {
-            let _ = lib.set_enhanced_path(s.id, &dest_str);
+            let _ = lib.set_enhanced_path(id, &dest_str);
         }
         out.push(EnhancePreviewDto {
             path: dest_str,
@@ -639,10 +661,18 @@ pub async fn batch_enhance_images(
             elapsed_ms,
             ink_ratio,
             used_sauvola,
-            width: gray.width(),
-            height: gray.height(),
+            width: ow,
+            height: oh,
         });
     }
+    let _ = app.emit(
+        "import:progress",
+        ImportProgress {
+            done: total,
+            total,
+            title: "增强完成".into(),
+        },
+    );
     Ok(out)
 }
 

@@ -415,6 +415,13 @@ impl Library {
         Ok(())
     }
 
+    /// 删除曲目（级联 image_asset/enhance/song_text/book_item）
+    pub fn delete_song(&self, song_id: i64) -> Result<(), LibraryError> {
+        self.conn
+            .execute("DELETE FROM song WHERE id = ?1", params![song_id])?;
+        Ok(())
+    }
+
     /// 记录增强输出路径（非破坏性，原图路径不变）
     pub fn set_enhanced_path(&self, song_id: i64, path: &str) -> Result<(), LibraryError> {
         self.conn.execute(

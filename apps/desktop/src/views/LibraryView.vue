@@ -4,6 +4,7 @@ import { useRouter } from "vue-router";
 import type { Song } from "@/domain/library";
 import {
   convertFileSrc,
+  deleteSong,
   getSongText,
   hasTauri,
   importImages,
@@ -278,6 +279,18 @@ async function editTags(s: Song) {
   }
 }
 
+async function onDeleteSong(s: Song) {
+  if (!window.confirm(`删除「${s.title}」？不删除磁盘上的原图文件。`)) return;
+  try {
+    await deleteSong(s.id);
+    selectedIds.value.delete(s.id);
+    selectedIds.value = new Set(selectedIds.value);
+    await refresh();
+  } catch (e) {
+    error.value = String(e);
+  }
+}
+
 </script>
 
 <template>
@@ -396,6 +409,9 @@ async function editTags(s: Song) {
               <span class="tags" @click.stop="editTags(s)" title="点击编辑标签">
                 {{ (s.tags || []).join(" ") || "标签" }}
               </span>
+              <button class="del" title="删除曲目" @click.stop="onDeleteSong(s)">
+                ×
+              </button>
             </div>
           </article>
         </div>
@@ -539,6 +555,20 @@ async function editTags(s: Song) {
   font-size: 11px !important;
   color: var(--accent) !important;
   opacity: 0.85;
+}
+.del {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  border: 0;
+  background: rgba(255, 255, 255, 0.85);
+  color: #a33;
+  border-radius: 4px;
+  width: 22px;
+  height: 22px;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
 }
 .filters {
   display: flex;

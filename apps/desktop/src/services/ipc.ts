@@ -319,3 +319,9 @@ export async function setSongTags(
   if (!invoke) return;
   await invoke("set_song_tags", { songId, tags });
 }
+
+export async function deleteSong(songId: number): Promise<void> {
+  const invoke = getInvoke();
+  if (!invoke) return;
+  await invoke("delete_song", { songId });
+}
