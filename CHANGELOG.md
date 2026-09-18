@@ -25,6 +25,13 @@
 - `npm run test:all` 全绿
 - tauri:dev 端口 1420 固定；修掉 vite.config.js 遮蔽问题
 
+### 后续加固（同日）
+
+- tauri:dev：端口清理、本地 tauri.js 启动（避开 Node26 spawn EINVAL）
+- 导入：系统对话框路径 + 字节导入回退（修「找不到文件」）
+- 导入/增强：async IPC + 进度事件，避免 UI 假死
+- 曲库：删除曲目、编辑器载入选择、册子图片缩放
+
 ### 未做
 
 - 打印几何 CI 门槛、超分、网络采集、OCR、多声部、拼页小册子
